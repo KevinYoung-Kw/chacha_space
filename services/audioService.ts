@@ -8,7 +8,6 @@ export const decodeAudioData = async (
     // but here we just pass it through.
     return await audioContext.decodeAudioData(audioData);
   } catch (e) {
-    console.error("Audio Decoding Error", e);
     throw e;
   }
 };

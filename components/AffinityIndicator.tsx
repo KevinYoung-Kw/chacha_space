@@ -87,10 +87,10 @@ const AffinityIndicator: React.FC<AffinityIndicatorProps> = ({
     
     return (
       <div className="relative w-7 h-7 flex items-center justify-center">
-        {/* 底层空心心 */}
+        {/* 底层空心心 - 使用与其它图标一致的描边 */}
         <Heart 
-          size={24} 
-          className="text-gray-200 transition-colors duration-500" 
+          size={22} 
+          className="transition-colors duration-500" 
         />
         {/* 上层填充心 - 使用 clip-path 实现垂直填充效果 */}
         <div 
@@ -100,9 +100,9 @@ const AffinityIndicator: React.FC<AffinityIndicatorProps> = ({
           }}
         >
           <Heart 
-            size={24} 
+            size={22} 
             fill={fillColor}
-            color={fillColor}
+            stroke="none"
             className="transition-colors duration-500"
           />
         </div>

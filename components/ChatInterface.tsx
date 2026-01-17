@@ -1,7 +1,7 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { Message } from '../types';
-import { Send, Mic, MicOff } from 'lucide-react';
+import { Send, Mic, MicOff, AlertCircle } from 'lucide-react';
 
 interface ChatInterfaceProps {
   messages: Message[];
@@ -10,6 +10,7 @@ interface ChatInterfaceProps {
   onStartListening: () => void;
   onStopListening: () => void;
   inputRef: React.RefObject<HTMLInputElement>;
+  isSpeaking?: boolean;
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ 
@@ -18,14 +19,27 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onSendMessage, 
   onStartListening,
   onStopListening,
-  inputRef 
+  inputRef,
+  isSpeaking = false
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [micError, setMicError] = useState<string>('');
+  
+  // 检查浏览器是否支持语音识别
+  const isSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
 
   // Auto scroll to bottom when new messages arrive
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // 自动清除错误提示
+  useEffect(() => {
+    if (micError) {
+      const timer = setTimeout(() => setMicError(''), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [micError]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && inputRef.current?.value) {
@@ -41,14 +55,32 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   };
 
-  // 点击切换模式：第一次点击开始，第二次点击停止
-  const handleVoiceButtonClick = () => {
+  // 简单直接的点击处理
+  const handleVoiceButtonClick = async () => {
+    setMicError('');
+
+    if (!isSupported) {
+      setMicError('浏览器不支持语音识别');
+      return;
+    }
+
     if (isListening) {
       // 正在录音，点击停止
       onStopListening();
     } else {
-      // 未录音，点击开始
-      onStartListening();
+      // 未录音，先请求麦克风权限再开始
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+        onStartListening();
+      } catch (err: any) {
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          setMicError('请允许访问麦克风');
+        } else if (err.name === 'NotFoundError') {
+          setMicError('未检测到麦克风');
+        } else {
+          setMicError('无法启动录音');
+        }
+      }
     }
   };
 
@@ -86,48 +118,63 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
               <input
                 ref={inputRef}
                 type="text"
-                placeholder=""
+                placeholder={isListening ? "正在录音..." : "输入消息..."}
                 disabled={isListening}
-                className={`w-full h-full px-3 bg-transparent rounded-full focus:outline-none text-sm font-medium placeholder-[#a89b8c] transition-opacity ${
+                className={`w-full h-full px-3 bg-transparent rounded-full focus:outline-none text-sm font-medium transition-all duration-300 ${
                   isListening 
-                    ? 'opacity-50 cursor-not-allowed text-[#8b7b6d]' 
-                    : 'text-[#5c4d43]'
+                    ? 'opacity-50 cursor-not-allowed text-[#8b7b6d] placeholder-[#c5b9aa]' 
+                    : 'text-[#5c4d43] placeholder-[#a89b8c] focus:bg-white/30'
                 }`}
                 onKeyDown={handleKeyDown}
               />
+              {isListening && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1">
+                  <span className="w-1 h-1 bg-rose-400 rounded-full animate-pulse" style={{ animationDelay: '0ms' }}></span>
+                  <span className="w-1 h-1 bg-rose-400 rounded-full animate-pulse" style={{ animationDelay: '150ms' }}></span>
+                  <span className="w-1 h-1 bg-rose-400 rounded-full animate-pulse" style={{ animationDelay: '300ms' }}></span>
+                </div>
+              )}
           </div>
 
           {/* Voice Button */}
           <div className="relative flex items-center justify-center">
+              {/* 错误提示 */}
+              {micError && (
+                  <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap bg-red-500 text-white text-[10px] px-3 py-1.5 rounded-lg shadow-lg flex items-center gap-1.5 animate-fade-in z-20 pointer-events-none">
+                    <AlertCircle size={12} />
+                    {micError}
+                  </div>
+              )}
+
               {/* Active Listening Visual Effects */}
-              {isListening && (
+              {isListening && !micError && (
                   <>
                      <div className="absolute inset-0 bg-rose-400 rounded-full blur-md opacity-40 animate-pulse pointer-events-none"></div>
                      <div className="absolute inset-0 bg-rose-300 rounded-full animate-ping opacity-50 pointer-events-none"></div>
-                     {/* 长期等待状态提示 */}
-                     <div className="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap bg-rose-500 text-white text-[10px] px-2 py-1 rounded-full shadow-lg animate-bounce flex items-center gap-1">
-                        <span className="w-1 h-1 bg-white rounded-full animate-pulse"></span>
-                        正在倾听...
-                     </div>
                   </>
               )}
               
               <button 
                   onClick={handleVoiceButtonClick}
+                  disabled={!isSupported}
+                  type="button"
                   className={`toolbar-btn w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 z-10 active:scale-95 select-none ${
-                      isListening 
-                      ? 'bg-rose-500 text-white scale-110 cursor-pointer shadow-[0_0_15px_rgba(244,63,94,0.5)]' 
+                      !isSupported 
+                      ? 'opacity-40 cursor-not-allowed text-gray-400'
+                      : isListening 
+                      ? 'bg-rose-500 text-white scale-110 cursor-pointer shadow-[0_0_15px_rgba(244,63,94,0.5)] hover:bg-rose-600' 
                       : 'text-[#8b7b6d] hover:text-[#5c4d43] hover:bg-[#e6ddd0] cursor-pointer'
                   }`}
-                  style={{ touchAction: 'none', userSelect: 'none' }}
                   title={isListening ? '点击停止录音' : '点击开始录音'}
               >
                   {isListening ? (
                     <div className="relative flex items-center justify-center">
-                      <MicOff size={18} />
+                      <MicOff size={18} className="drop-shadow-sm" />
                       <span className="absolute -inset-1 rounded-full border-2 border-white/30 animate-ping"></span>
                     </div>
-                  ) : <Mic size={18} />}
+                  ) : (
+                    <Mic size={18} />
+                  )}
               </button>
           </div>
 

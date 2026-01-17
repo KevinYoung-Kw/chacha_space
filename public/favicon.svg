@@ -1,18 +1,30 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
-  <defs>
-    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#a78bfa;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#ec4899;stop-opacity:1" />
-    </linearGradient>
-  </defs>
-  <!-- 背景圆 -->
-  <circle cx="50" cy="50" r="48" fill="url(#grad)"/>
-  <!-- 可爱的笑脸 -->
-  <circle cx="35" cy="40" r="5" fill="white"/>
-  <circle cx="65" cy="40" r="5" fill="white"/>
-  <!-- 微笑 -->
-  <path d="M 30 60 Q 50 75 70 60" stroke="white" stroke-width="4" fill="none" stroke-linecap="round"/>
-  <!-- 小星星装饰 -->
-  <circle cx="20" cy="20" r="3" fill="white" opacity="0.8"/>
-  <circle cx="80" cy="25" r="2" fill="white" opacity="0.6"/>
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 24.1.2, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="图层_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 566.9 566.9" style="enable-background:new 0 0 566.9 566.9;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:#D3E49B;}
+	.st1{fill:#1A1A1A;stroke:#191919;stroke-width:20;stroke-miterlimit:10;}
+</style>
+<g>
+	<path class="st0" d="M428.5,566.6h-290c-76.4,0-138.3-61.9-138.3-138.3v-290C0.2,62,62.1,0.1,138.4,0.1h290
+		c76.4,0,138.3,61.9,138.3,138.3v290C566.7,504.7,504.8,566.6,428.5,566.6z"/>
+	<path class="st1" d="M397,443.8H169.9c-47.9,0-86.8-39-86.8-86.8V188.1c0-35.8,29.1-64.9,64.9-64.9c25.1,0,48.2,14.7,58.8,37.5
+		l23.9,51.2c3.3,7,10.4,11.6,18.2,11.6h69.2c7.7,0,14.9-4.5,18.2-11.6l23.9-51.1c10.6-22.8,33.7-37.5,58.8-37.5
+		c35.8,0,64.9,29.1,64.9,64.9v168.8C483.8,404.8,444.9,443.8,397,443.8L397,443.8z M148,163.2c-13.7,0-24.8,11.1-24.8,24.8v168.8
+		c0,25.8,21,46.8,46.8,46.8H397c25.8,0,46.8-21,46.8-46.8V188.1c0-13.7-11.1-24.8-24.8-24.8c-9.6,0-18.5,5.6-22.5,14.3l-23.9,51.2
+		c-9.8,21.1-31.2,34.7-54.5,34.7h-69.2c-23.3,0-44.6-13.6-54.5-34.7l-23.9-51.2C166.5,168.9,157.6,163.2,148,163.2z"/>
+</g>
+<g>
+</g>
+<g>
+</g>
+<g>
+</g>
+<g>
+</g>
+<g>
+</g>
+<g>
+</g>
 </svg>

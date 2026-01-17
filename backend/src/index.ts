@@ -19,6 +19,7 @@ import categoryRoutes from './routes/category';
 import healthRoutes from './routes/health';
 import weatherRoutes from './routes/weather';
 import ttsRoutes from './routes/tts';
+import sttRoutes from './routes/stt';
 import memoryRoutes from './routes/memory';
 import emotionRoutes from './routes/emotion';
 
@@ -55,6 +56,7 @@ app.use('/api/todos', todoRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/weather', weatherRoutes);
 app.use('/api/tts', ttsRoutes);
+app.use('/api', sttRoutes);
 app.use('/api/memories', memoryRoutes);
 app.use('/api/emotion', emotionRoutes);
 

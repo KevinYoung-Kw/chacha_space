@@ -99,13 +99,7 @@ const App: React.FC = () => {
   const [categories, setCategories] = useState<TodoCategory[]>([]);
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [weather, setWeather] = useState<WeatherData | null>(null);
-  const isListeningRef = useRef(false);
   const [isListening, setIsListening] = useState(false);
-  
-  // 同步 ref 和 state
-  useEffect(() => {
-    isListeningRef.current = isListening;
-  }, [isListening]);
   
   // Health Data State
   const [healthData, setHealthData] = useState<{
@@ -161,10 +155,6 @@ const App: React.FC = () => {
 
   // --- Refs ---
   const recognitionRef = useRef<any>(null);
-  const silenceTimerRef = useRef<number | null>(null);
-  const hasSpeechResultRef = useRef(false);
-  const isManuallyStoppingRef = useRef(false); // 记录是否是用户手动停止
-  const silenceTimeoutMs = 5000;
   const audioContextRef = useRef<AudioContext | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const weatherFetchedRef = useRef<boolean>(false);
@@ -268,7 +258,6 @@ const App: React.FC = () => {
         window.speechSynthesis.speak(utterance);
       }
     } catch (e) {
-      console.error('[TTS] Error:', e);
       setState(AssistantState.IDLE);
     }
   };
@@ -343,7 +332,6 @@ const App: React.FC = () => {
         // 根据情绪检测结果播放对应动画
         if (emotionResult.success && emotionResult.data) {
           const { action: emotionAction } = emotionResult.data;
-          console.log('[Emotion] Detected action:', emotionAction);
           // 如果是正面或负面情绪，播放对应动画；否则播放说话动画
           if (emotionAction && emotionAction !== 'listening_v2' && emotionAction !== 'nod') {
             videoAvatarRef.current?.playAction(emotionAction);
@@ -426,148 +414,107 @@ const App: React.FC = () => {
      fetchWeather();
   }, [user]);
 
-  // --- 语音识别设置 ---
-  const clearSilenceTimer = () => {
-    if (silenceTimerRef.current) {
-      window.clearTimeout(silenceTimerRef.current);
-      silenceTimerRef.current = null;
-    }
-  };
+  // --- 语音识别设置（使用后端 API）---
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recognitionActiveRef = useRef(false);
 
-  // 初始化语音识别（只初始化一次）
-  useEffect(() => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true; // 连续模式，直到手动停止
-      recognition.interimResults = false; // 只返回最终结果
-      recognition.lang = 'zh-CN';
-      
-      // 用于累积识别结果
-      const transcriptParts: string[] = [];
-      
-      recognition.onstart = () => {
-        transcriptParts.length = 0; // 清空之前的结果
-        hasSpeechResultRef.current = false;
-        isManuallyStoppingRef.current = false; // 重置手动停止标志
-        setIsListening(true);
-        setState(AssistantState.LISTENING);
-        clearSilenceTimer();
-      };
-      
-      recognition.onend = () => {
-        // 如果不是手动停止，且仍处于监听状态（说明是由于静音等原因自动结束），则尝试重新启动以维持“长期等待状态”
-        if (!isManuallyStoppingRef.current && isListeningRef.current) {
-          try {
-            recognition.start();
-            return; // 跳过后续逻辑，继续等待
-          } catch (e) {
-            console.error('[SpeechRecognition] Restart error:', e);
-          }
-        }
-
-        clearSilenceTimer();
-        setIsListening(false);
-        setState((prevState) => prevState === AssistantState.LISTENING ? AssistantState.IDLE : prevState);
-        
-        // 如果有识别结果，填入输入框
-        if (transcriptParts.length > 0 && hasSpeechResultRef.current) {
-          const fullTranscript = transcriptParts.join(' ').trim();
-          if (fullTranscript && inputRef.current) {
-            const currentValue = inputRef.current.value || '';
-            const newValue = currentValue ? `${currentValue} ${fullTranscript}` : fullTranscript;
-            inputRef.current.value = newValue;
-            // 触发 input 事件，确保 React 能感知到变化
-            const inputEvent = new Event('input', { bubbles: true });
-            inputRef.current.dispatchEvent(inputEvent);
-            // 聚焦输入框
-            inputRef.current.focus();
-          }
-        }
-      };
-      
-      recognition.onerror = (event: any) => {
-        console.error('[SpeechRecognition] Error:', event.error);
-        clearSilenceTimer();
-        setIsListening(false);
-        setState((prevState) => prevState === AssistantState.LISTENING ? AssistantState.IDLE : prevState);
-        // 如果是用户取消，不显示错误
-        if (event.error !== 'no-speech' && event.error !== 'aborted') {
-          console.warn('[SpeechRecognition] Error:', event.error);
-        }
-      };
-      
-      recognition.onresult = (event: any) => {
-        hasSpeechResultRef.current = true;
-        // 累积所有识别结果
-        for (let i = 0; i < event.results.length; i++) {
-          const transcript = event.results[i][0].transcript;
-          if (transcript && transcript.trim()) {
-            transcriptParts.push(transcript.trim());
-          }
-        }
-      };
-      
-      recognitionRef.current = recognition;
-    }
-    
-    return () => {
-      clearSilenceTimer();
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (e) {
-          // 忽略停止时的错误
-        }
-      }
-    };
-  }, []); // 只在组件挂载时初始化一次
-
-  const startListening = useCallback(() => {
-    if (!recognitionRef.current) {
-      console.warn('[SpeechRecognition] Not available');
+  const startListening = useCallback(async () => {
+    if (recognitionActiveRef.current) {
       return;
     }
-    
-    if (isListening) {
-      return; // 已经在监听中
-    }
-    
+
     try {
-      recognitionRef.current.start();
+      console.log('[Voice] 请求麦克风权限...');
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      console.log('[Voice] ✅ 开始录音');
+      recognitionActiveRef.current = true;
+      setIsListening(true);
+      setState(AssistantState.LISTENING);
+      
+      audioChunksRef.current = [];
+      
+      // 使用 MediaRecorder 录音
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+      
+      mediaRecorder.onstop = async () => {
+        console.log('[Voice] 录音结束，处理音频...');
+        recognitionActiveRef.current = false;
+        setIsListening(false);
+        setState((prev) => prev === AssistantState.LISTENING ? AssistantState.IDLE : prev);
+        
+        // 停止音频流
+        stream.getTracks().forEach(track => track.stop());
+        
+        // 合并音频数据
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        console.log('[Voice] 音频大小:', (audioBlob.size / 1024).toFixed(2), 'KB');
+        
+        if (audioBlob.size < 1000) {
+          console.warn('[Voice] ⚠️ 录音时间太短');
+          return;
+        }
+        
+        // 发送到后端识别
+        try {
+          console.log('[Voice] 发送到后端识别...');
+          const formData = new FormData();
+          formData.append('audio', audioBlob, 'recording.webm');
+          
+          const response = await fetch('http://localhost:3001/api/speech-to-text', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            },
+            body: formData
+          });
+          
+          if (!response.ok) {
+            throw new Error('识别失败');
+          }
+          
+          const data = await response.json();
+          const text = data.text?.trim();
+          
+          if (text && inputRef.current) {
+            const currentValue = inputRef.current.value || '';
+            const newValue = currentValue ? `${currentValue} ${text}` : text;
+            inputRef.current.value = newValue;
+            console.log('[Voice] ✅ 识别结果:', text);
+            inputRef.current.focus();
+          } else {
+            console.warn('[Voice] ⚠️ 未识别到文字');
+          }
+        } catch (error) {
+          console.error('[Voice] 识别错误:', error);
+        }
+      };
+      
+      mediaRecorder.start();
+      console.log('[Voice] 录音中...');
+      
     } catch (error: any) {
-      // 如果已经在运行，忽略错误
-      if (error.name !== 'InvalidStateError') {
-        console.error('[SpeechRecognition] Start error:', error);
-      }
+      console.error('[Voice] 启动失败:', error);
+      recognitionActiveRef.current = false;
+      setIsListening(false);
+      setState((prev) => prev === AssistantState.LISTENING ? AssistantState.IDLE : prev);
     }
-  }, [isListening]);
+  }, []);
 
   const stopListening = useCallback(() => {
-    if (!recognitionRef.current) {
-      return;
+    if (mediaRecorderRef.current && recognitionActiveRef.current) {
+      console.log('[Voice] 停止录音');
+      mediaRecorderRef.current.stop();
     }
-    
-    // 如果不在监听状态，直接返回
-    if (!isListening) {
-      return;
-    }
-    
-    try {
-      isManuallyStoppingRef.current = true; // 标记为手动停止
-      clearSilenceTimer();
-      // 停止识别，onend 事件会自动处理状态重置
-      recognitionRef.current.stop();
-    } catch (error: any) {
-      // 如果识别已经停止，忽略错误
-      if (error.name !== 'InvalidStateError') {
-        console.error('[SpeechRecognition] Stop error:', error);
-      }
-      // 即使出错也要重置状态
-      setIsListening(false);
-      setState((prevState) => prevState === AssistantState.LISTENING ? AssistantState.IDLE : prevState);
-    }
-  }, [isListening]);
+  }, []);
 
   // 缓存视频人物配置（避免每次渲染都重新创建）
   // 使用带有情绪动作的配置，支持好感度系统
@@ -776,11 +723,16 @@ const App: React.FC = () => {
                     config={characterConfig}
                     className="h-full w-full"
                     autoPlay={true}
-                debug={false}
-                    onStateChange={(event) => {
-                  console.log('[App] Character state:', event.currentState);
-                    }}
+                    debug={false}
                   />
+
+                  {/* 好感度变化提示 - 字幕风格，位于叉叉中间区域 */}
+                  {affinityToast && (
+                    <AffinityToast
+                      event={affinityToast}
+                      onClose={() => setAffinityToast(null)}
+                    />
+                  )}
         </div>
 
             {/* Chat Interface */}
@@ -791,6 +743,7 @@ const App: React.FC = () => {
               <ChatInterface 
                 messages={messages}
                 isListening={isListening}
+                isSpeaking={state === AssistantState.SPEAKING}
                 onSendMessage={processInput}
                 onStartListening={startListening}
                 onStopListening={stopListening}
@@ -889,29 +842,9 @@ const App: React.FC = () => {
           </div>
         </div>
 
-        {/* 好感度变化提示 Toast */}
-        {affinityToast && (
-          <AffinityToast
-            event={affinityToast}
-            onClose={() => setAffinityToast(null)}
-          />
-        )}
-
-        {/* 浮动好感度提示 - 在角色左右两侧 */}
-        {floatingHints.map((hint) => (
-          <FloatingAffinityHint
-            key={hint.id}
-            event={hint.event}
-            side={hint.side}
-            offset={hint.offset}
-            onComplete={() => {
-              setFloatingHints(prev => prev.filter(h => h.id !== hint.id));
-            }}
-          />
-        ))}
-    </div>
-  );
-};
+     </div>
+    );
+  };
 
 // Scrollable Toolbar Component
 const ScrollableToolbar = ({ 

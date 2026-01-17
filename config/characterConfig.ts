@@ -290,18 +290,11 @@ export function createEmotionalConfig(): StateMachineConfig {
     // 待机动画不设置 nextStateID，让状态机自动选择下一个
     const isIdleAnimation = id.includes('IDLE_') || id === 'ACTION_LISTENING_V2' || id === 'ACTION_OBSERVING';
     
-    const nextState = isIdleAnimation ? null : VideoStateID.IDLE_CENTER;
-    
-    // 调试日志
-    if (isIdleAnimation) {
-      console.log(`[Config] Setting ${id} as idle animation (nextStateID: null)`);
-    }
-    
     states.set(id as VideoStateID, {
       stateID: id as VideoStateID,
       videoSource: video,
       isLoop: false,
-      nextStateID: nextState,
+      nextStateID: isIdleAnimation ? null : VideoStateID.IDLE_CENTER,
       preloadStates: [VideoStateID.IDLE_CENTER],
     });
   });

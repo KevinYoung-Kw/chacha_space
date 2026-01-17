@@ -21,11 +21,11 @@ const AffinityToast: React.FC<AffinityToastProps> = ({ event, onClose }) => {
     // 触发进入动画
     setTimeout(() => setIsVisible(true), 10);
     
-    // 3秒后自动关闭
+    // 1.8秒后自动关闭（大幅缩短停留时间）
     const timer = setTimeout(() => {
       setIsVisible(false);
-      setTimeout(onClose, 300); // 等待动画完成
-    }, 3000);
+      setTimeout(onClose, 800); // 预留较长的淡出时间，保证丝滑
+    }, 1800);
 
     return () => clearTimeout(timer);
   }, [onClose]);
@@ -33,62 +33,29 @@ const AffinityToast: React.FC<AffinityToastProps> = ({ event, onClose }) => {
   return (
     <div
       className={`
-        fixed top-20 right-4 md:right-6 z-50
-        transform transition-all duration-300 ease-out
-        ${isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'}
+        absolute top-[45%] left-1/2 -translate-x-1/2 z-[100]
+        transition-all duration-1000 cubic-bezier(0.16, 1, 0.3, 1) pointer-events-none
+        flex flex-col items-center gap-1
+        ${isVisible 
+          ? 'opacity-100 -translate-y-4' 
+          : 'opacity-0 translate-y-0'}
       `}
     >
-      <div
-        className={`
-          flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl
-          backdrop-blur-md border
-          ${isPositive 
-            ? 'bg-green-50/90 border-green-200 text-green-700' 
-            : 'bg-red-50/90 border-red-200 text-red-700'
-          }
-          min-w-[280px] max-w-[320px]
-        `}
-      >
-        {/* 图标 */}
-        <div className={`
-          flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center
-          ${isPositive ? 'bg-green-100' : 'bg-red-100'}
-        `}>
-          {isPositive ? (
-            <TrendingUp size={20} className="text-green-600" />
-          ) : (
-            <TrendingDown size={20} className="text-red-600" />
-          )}
-        </div>
-
-        {/* 内容 */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <Heart 
-              size={14} 
-              className={`${isPositive ? 'text-green-600 fill-current' : 'text-red-600'}`}
-            />
-            <span className="font-bold text-sm">
-              {isPositive ? '+' : ''}{event.change} 好感度
-            </span>
-          </div>
-          <p className="text-xs text-gray-600 line-clamp-2">
-            {event.reason}
-          </p>
-        </div>
-
-        {/* 关闭按钮 */}
-        <button
-          onClick={() => {
-            setIsVisible(false);
-            setTimeout(onClose, 300);
-          }}
-          className="flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M12.854 3.146a.5.5 0 0 0-.708-.708L8 7.293 3.854 3.146a.5.5 0 1 0-.708.708L7.293 8l-4.147 4.146a.5.5 0 0 0 .708.708L8 8.707l4.146 4.147a.5.5 0 0 0 .708-.708L8.707 8l4.147-4.854z"/>
-          </svg>
-        </button>
+      {/* 极简数字与心形 */}
+      <div className={`flex items-center gap-1.5 font-bold tracking-widest text-lg
+        ${isPositive ? 'text-rose-500/90' : 'text-gray-400/90'}`}
+        style={{ textShadow: '0 2px 10px rgba(255,255,255,0.8)' }}>
+        <Heart 
+          size={16} 
+          className={`${isPositive ? 'fill-rose-500/80' : ''}`}
+        />
+        <span>{isPositive ? '+' : ''}{event.change}</span>
+      </div>
+      
+      {/* 微型理由字幕 */}
+      <div className={`text-[9px] font-medium tracking-wider opacity-60
+        ${isPositive ? 'text-rose-600' : 'text-gray-600'}`}>
+        {event.reason}
       </div>
     </div>
   );

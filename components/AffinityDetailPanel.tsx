@@ -70,82 +70,82 @@ const AffinityDetailPanel: React.FC<AffinityDetailPanelProps> = ({ affinity, onC
   };
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-white to-gray-50">
+    <div className="h-full flex flex-col bg-[var(--color-bg-warm)] font-sans">
       {/* Header */}
-      <div className="px-6 pt-6 pb-4 border-b border-gray-200">
+      <div className="px-6 pt-6 pb-4 border-b border-[var(--color-border-subtle)]">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">好感度详情</h2>
-            <p className="text-xs text-gray-500 mt-1">查看你的互动记录</p>
+            <h2 className="text-2xl font-bold text-[var(--color-text-primary)]">好感度详情</h2>
+            <p className="text-xs text-[var(--color-text-muted)] mt-1">查看你的互动记录</p>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+            className="w-8 h-8 rounded-full hover:bg-black/5 flex items-center justify-center transition-colors"
           >
-            <X size={18} className="text-gray-500" />
+            <X size={18} className="text-[var(--color-text-secondary)]" />
           </button>
         </div>
 
         {/* 当前好感度卡片 */}
-        <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm">
+        <div className="bg-white/60 backdrop-blur-sm rounded-2xl p-4 border border-[var(--color-border-subtle)] shadow-sm">
           <AffinityIndicator affinity={affinity} showDetails={true} />
         </div>
       </div>
 
       {/* 统计信息 */}
-      <div className="px-6 py-4 border-b border-gray-200">
+      <div className="px-6 py-4 border-b border-[var(--color-border-subtle)]">
         <div className="grid grid-cols-4 gap-3">
           <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{totalGained}</div>
-            <div className="text-xs text-gray-500 mt-1">总获得积分</div>
+            <div className="text-2xl font-bold text-rose-500">{totalGained}</div>
+            <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mt-1">总获得</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-red-600">{totalLost}</div>
-            <div className="text-xs text-gray-500 mt-1">总减少积分</div>
+            <div className="text-2xl font-bold text-gray-400">{totalLost}</div>
+            <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mt-1">总减少</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{affinity.value}</div>
-            <div className="text-xs text-gray-500 mt-1">当前积分</div>
+            <div className="text-2xl font-bold text-[var(--color-text-primary)]">{affinity.value}</div>
+            <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mt-1">当前积分</div>
           </div>
           <div className="text-center">
-            <div className="text-2xl font-bold text-purple-600">{affinity.totalInteractions}</div>
-            <div className="text-xs text-gray-500 mt-1">总互动次数</div>
+            <div className="text-2xl font-bold text-[var(--color-text-secondary)]">{affinity.totalInteractions}</div>
+            <div className="text-[10px] text-[var(--color-text-muted)] uppercase tracking-wider mt-1">互动次数</div>
           </div>
         </div>
       </div>
 
       {/* 历史记录 - 可滚动查看 */}
       <div className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar">
-        <h3 className="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-2">
-          <Activity size={16} />
+        <h3 className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide mb-4 flex items-center gap-2">
+          <Activity size={14} className="text-rose-400" />
           互动历史
         </h3>
 
         {Object.keys(groupedHistory).length === 0 ? (
-          <div className="text-center py-12 text-gray-400">
-            <Heart size={32} className="mx-auto mb-2 opacity-30" />
-            <p className="text-sm">还没有互动记录</p>
+          <div className="text-center py-12">
+            <Heart size={32} className="mx-auto mb-2 text-[var(--color-text-muted)] opacity-20" />
+            <p className="text-sm text-[var(--color-text-muted)]">还没有互动记录</p>
           </div>
         ) : (
           <div className="space-y-4">
             {Object.entries(groupedHistory).map(([date, events]) => (
-              <details key={date} className="rounded-xl border border-gray-200 bg-white">
-                <summary className="flex items-center gap-2 px-3 py-2 cursor-pointer select-none">
-                  <Calendar size={14} className="text-gray-400" />
-                  <span className="text-xs font-semibold text-gray-500">{date}</span>
-                  <span className="ml-auto text-[10px] text-gray-400">收起/展开</span>
-                </summary>
-                <div className="space-y-2 px-3 pb-3">
+              <div key={date} className="space-y-2">
+                <div className="flex items-center gap-2 px-1 mb-2">
+                  <Calendar size={12} className="text-[var(--color-text-muted)]" />
+                  <span className="text-[11px] font-bold text-[var(--color-text-muted)] uppercase tracking-wider">{date}</span>
+                </div>
+                
+                <div className="space-y-2">
                   {events.map((event, index) => {
                     const isPositive = event.change > 0;
                     return (
                       <div
                         key={`${event.timestamp}-${index}`}
                         className={`
-                          flex items-center justify-between p-3 rounded-xl
+                          flex items-center justify-between p-3 rounded-xl border transition-all
                           ${isPositive 
-                            ? 'bg-green-50 border border-green-100' 
-                            : 'bg-red-50 border border-red-100'
+                            ? 'bg-white/40 border-rose-100/50' 
+                            : 'bg-black/5 border-transparent opacity-80'
                           }
                         `}
                       >
@@ -153,36 +153,36 @@ const AffinityDetailPanel: React.FC<AffinityDetailPanelProps> = ({ affinity, onC
                           {/* 图标 */}
                           <div className={`
                             flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center
-                            ${isPositive ? 'bg-green-100' : 'bg-red-100'}
+                            ${isPositive ? 'bg-rose-50 text-rose-500' : 'bg-gray-100 text-gray-500'}
                           `}>
                             {isPositive ? (
-                              <TrendingUp size={14} className="text-green-600" />
+                              <TrendingUp size={14} />
                             ) : (
-                              <TrendingDown size={14} className="text-red-600" />
+                              <TrendingDown size={14} />
                             )}
                           </div>
 
                           {/* 内容 */}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <span className="text-sm font-medium text-gray-800">
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <span className="text-sm font-semibold text-[var(--color-text-primary)]">
                                 {getActionTypeText(event.action)}
                               </span>
                               <span className={`
-                                text-xs font-bold px-1.5 py-0.5 rounded
-                                ${isPositive ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100'}
+                                text-[10px] font-bold px-1.5 py-0.5 rounded-full
+                                ${isPositive ? 'text-rose-600 bg-rose-50' : 'text-gray-600 bg-gray-100'}
                               `}>
-                                {isPositive ? '+' : ''}{event.change} 积分
+                                {isPositive ? '+' : ''}{event.change}
                               </span>
                             </div>
-                            <p className="text-xs text-gray-600 line-clamp-1">
+                            <p className="text-[11px] text-[var(--color-text-secondary)] line-clamp-1">
                               {event.reason}
                             </p>
                           </div>
                         </div>
 
                         {/* 时间 */}
-                        <div className="flex-shrink-0 text-xs text-gray-400 ml-2">
+                        <div className="flex-shrink-0 text-[10px] text-[var(--color-text-muted)] font-medium ml-2">
                           {new Date(event.timestamp).toLocaleTimeString('zh-CN', {
                             hour: '2-digit',
                             minute: '2-digit'
@@ -192,7 +192,7 @@ const AffinityDetailPanel: React.FC<AffinityDetailPanelProps> = ({ affinity, onC
                     );
                   })}
                 </div>
-              </details>
+              </div>
             ))}
           </div>
         )}

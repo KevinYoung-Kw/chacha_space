@@ -136,13 +136,6 @@ const TodoPanel: React.FC<TodoPanelProps> = ({ categories, todos, onToggle, onAd
     const deadline = formatDeadline(todo.deadline);
     const Icon = todo.categoryIcon ? getIcon(todo.categoryIcon) : List;
     
-    // 提取分类颜色（从 Tailwind 类名中提取颜色值）
-    const getCategoryColorClass = () => {
-      if (!todo.categoryColor) return 'border-gray-200';
-      // 将 bg-blue-500 转换为 border-blue-500
-      return todo.categoryColor.replace('bg-', 'border-');
-    };
-    
     const getCheckboxColorClass = () => {
       if (isCompleted) {
         if (todo.categoryColor === 'bg-blue-500') return 'text-blue-500';
@@ -158,9 +151,9 @@ const TodoPanel: React.FC<TodoPanelProps> = ({ categories, todos, onToggle, onAd
     
     return (
       <div 
-        className={`group flex items-start gap-3 py-3 px-3 pl-3 rounded-lg border-l-4 transition-all duration-200 ${
+        className={`group flex items-start gap-3 py-3 px-3 rounded-lg transition-all duration-200 ${
           isCompleted ? 'opacity-60 bg-gray-50/50' : 'bg-white/40 hover:bg-white/60'
-        } ${getCategoryColorClass()}`}
+        }`}
       >
         {/* Checkbox */}
         <button

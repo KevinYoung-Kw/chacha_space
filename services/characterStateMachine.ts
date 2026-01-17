@@ -278,7 +278,6 @@ export class VirtualCharacterStateMachine {
       if (idleTime >= timeout.sleepDelay && !this.isInIdleMode) {
         // 80% 概率播放普通睡觉，20% 概率播放长睡眠
         const sleepAction = Math.random() < 0.8 ? 'sleeping' : 'sleeping_long';
-        console.log('[StateMachine] Idle timeout reached, playing sleeping animation:', sleepAction);
         this.isInIdleMode = true;
         this.playAction(sleepAction);
       }
@@ -287,7 +286,6 @@ export class VirtualCharacterStateMachine {
         const randomAction = timeout.randomIdleActions[
           Math.floor(Math.random() * timeout.randomIdleActions.length)
         ];
-        console.log('[StateMachine] Playing random idle animation:', randomAction);
         this.isInIdleMode = true;
         this.playAction(randomAction);
       }
@@ -311,7 +309,6 @@ export class VirtualCharacterStateMachine {
    * @param containerElement 容器元素（用于创建双缓冲视频）
    */
   public initialize(containerElement: HTMLElement): void {
-    console.log('[StateMachine] Initializing...');
     
     // 创建双缓冲视频元素
     this.bufferA = this.createVideoBuffer('buffer-a');
@@ -338,8 +335,6 @@ export class VirtualCharacterStateMachine {
     // 启动空闲检测
     this.startIdleDetection();
 
-    console.log('[StateMachine] Initialized with state:', this.currentStateID);
-    console.log('[StateMachine] Video source:', this.config.states.get(this.currentStateID)?.videoSource);
   }
 
   /**
@@ -378,19 +373,16 @@ export class VirtualCharacterStateMachine {
 
     // 监听错误事件
     video.addEventListener('error', (e) => {
-      console.error(`[StateMachine] Video error in ${id}:`, e);
       const buffer = id === 'buffer-a' ? this.bufferA : this.bufferB;
       
       // 标记视频加载失败，不要尝试重新加载（避免无限循环）
       if (buffer) {
         buffer.isReady = false;
-        console.error(`[StateMachine] Video load failed for ${buffer.currentState}, marked as not ready`);
       }
     });
 
     // 监听加载元数据事件
     video.addEventListener('loadedmetadata', () => {
-      console.log(`[StateMachine] Video ${id} metadata loaded`);
     });
 
     return {
@@ -430,7 +422,6 @@ export class VirtualCharacterStateMachine {
   private loadVideoToBuffer(buffer: VideoBuffer, stateID: VideoStateID): void {
     const state = this.config.states.get(stateID);
     if (!state) {
-      console.error(`[StateMachine] State not found: ${stateID}`);
       return;
     }
 
@@ -462,7 +453,6 @@ export class VirtualCharacterStateMachine {
     // 获取目标状态配置
     const targetState = this.config.states.get(targetStateID);
     if (!targetState) {
-      console.error(`[StateMachine] Target state not found: ${targetStateID}`);
       return;
     }
 
@@ -476,7 +466,6 @@ export class VirtualCharacterStateMachine {
     const nextBuffer = this.activeBuffer === 'A' ? this.bufferB : this.bufferA;
 
     if (!currentBuffer || !nextBuffer) {
-      console.error('[StateMachine] Buffers not initialized');
       return;
     }
 
@@ -496,22 +485,18 @@ export class VirtualCharacterStateMachine {
 
     // 检查视频是否真的准备好了
     if (nextBuffer.element.error) {
-      console.error('[StateMachine] Video has error, cannot transition to', targetStateID);
-      
+
       // 如果目标状态是IDLE_CENTER，说明已经在尝试回退了，不要再回退
       if (targetStateID === VideoStateID.IDLE_CENTER) {
-        console.error('[StateMachine] IDLE_CENTER video failed to load, cannot recover');
         return;
       }
       
       // 如果当前buffer还在正常播放，就保持当前状态
       if (currentBuffer.element && !currentBuffer.element.error && !currentBuffer.element.paused) {
-        console.warn('[StateMachine] Staying in current state due to video load failure');
         return;
       }
       
       // 尝试回退到idle状态
-      console.warn('[StateMachine] Attempting to recover by transitioning to IDLE_CENTER');
       // 使用 setTimeout 避免递归调用堆栈过深
       setTimeout(() => {
         this.transitionTo(VideoStateID.IDLE_CENTER, true);
@@ -537,18 +522,14 @@ export class VirtualCharacterStateMachine {
     // 播放新视频
     try {
       await nextBuffer.element.play();
-      console.log(`[StateMachine] Successfully playing ${targetStateID}`);
     } catch (e) {
-      console.warn('[StateMachine] Auto-play blocked, waiting for user interaction');
       // 当自动播放被阻止时，添加一次性点击监听器来恢复播放
       const resumePlayback = async () => {
         try {
           await nextBuffer.element.play();
-          console.log('[StateMachine] Playback resumed after user interaction');
           document.removeEventListener('click', resumePlayback);
           document.removeEventListener('touchstart', resumePlayback);
         } catch (err) {
-          console.error('[StateMachine] Failed to resume playback:', err);
         }
       };
       document.addEventListener('click', resumePlayback, { once: true });
@@ -586,7 +567,6 @@ export class VirtualCharacterStateMachine {
         if (!resolved) {
           resolved = true;
           buffer.isReady = true;
-          console.log(`[StateMachine] Video ready for ${buffer.currentState}`);
           cleanup();
           resolve();
         }
@@ -596,7 +576,6 @@ export class VirtualCharacterStateMachine {
       const onError = (e: Event) => {
         if (!resolved) {
           resolved = true;
-          console.error(`[StateMachine] Video load error for ${buffer.currentState}:`, e);
           cleanup();
           // 即使出错也resolve，让上层决定如何处理
           resolve();
@@ -615,7 +594,6 @@ export class VirtualCharacterStateMachine {
       setTimeout(() => {
         if (!resolved) {
           resolved = true;
-          console.warn(`[StateMachine] Video ready timeout for ${buffer.currentState}, readyState=${buffer.element.readyState}`);
           cleanup();
           // 即使超时也标记为ready，尝试播放
           buffer.isReady = buffer.element.readyState >= 2; // 至少有当前帧数据
@@ -630,7 +608,6 @@ export class VirtualCharacterStateMachine {
         if (buffer.element.readyState >= 3) {
           resolved = true;
           buffer.isReady = true;
-          console.log(`[StateMachine] Video ready (polled) for ${buffer.currentState}`);
           cleanup();
           resolve();
           return;
@@ -686,11 +663,8 @@ export class VirtualCharacterStateMachine {
     const currentState = this.config.states.get(this.currentStateID);
     if (!currentState) return;
 
-    console.log(`[StateMachine] Video ended: ${this.currentStateID}, isLoop: ${currentState.isLoop}, nextStateID: ${currentState.nextStateID}`);
-
     // 如果有自动跳转目标，执行跳转
     if (!currentState.isLoop && currentState.nextStateID) {
-      console.log(`[StateMachine] Auto-jumping to nextStateID: ${currentState.nextStateID}`);
       this.transitionTo(currentState.nextStateID, false);
       return;
     }
@@ -699,10 +673,7 @@ export class VirtualCharacterStateMachine {
     const idleAnimationPattern = /^(IDLE_CENTER|ACTION_(IDLE_|LISTENING_V2|OBSERVING))/;
     if (idleAnimationPattern.test(this.currentStateID) && !currentState.isLoop && !currentState.nextStateID) {
       const nextIdleAnimation = this.getRandomIdleAnimation();
-      console.log('[StateMachine] Idle animation ended, playing next random idle:', nextIdleAnimation);
       this.playAction(nextIdleAnimation);
-    } else {
-      console.log(`[StateMachine] No action taken for ended video: ${this.currentStateID}`);
     }
   }
 
@@ -734,7 +705,6 @@ export class VirtualCharacterStateMachine {
    * 场景 A：聚焦左侧（打开左侧面板）
    */
   public focusLeft(): void {
-    console.log('[StateMachine] focusLeft() called');
     this.resetActivityTimer(); // 重置活动计时器
     
     // 如果已经在左边，不做任何事
@@ -748,7 +718,6 @@ export class VirtualCharacterStateMachine {
    * 场景 B：聚焦右侧（打开右侧面板）
    */
   public focusRight(): void {
-    console.log('[StateMachine] focusRight() called');
     this.resetActivityTimer(); // 重置活动计时器
     
     // 如果已经在右边，不做任何事
@@ -765,7 +734,6 @@ export class VirtualCharacterStateMachine {
    * 场景 C：聚焦中间（关闭面板，返回默认）
    */
   public focusCenter(): void {
-    console.log('[StateMachine] focusCenter() called');
     this.resetActivityTimer(); // 重置活动计时器
     
     // 如果已经在中间，不做任何事
@@ -795,7 +763,6 @@ export class VirtualCharacterStateMachine {
    * @param actionName 动作名称
    */
   public playAction(actionName: string): void {
-    console.log(`[StateMachine] playAction("${actionName}") called`);
     
     // 重置活动计时器（除了自动播放的随机待机动画）
     if (!this.isInIdleMode) {
@@ -868,14 +835,12 @@ export class VirtualCharacterStateMachine {
 
     const actionStateID = actionMap[actionName];
     if (!actionStateID) {
-      console.warn(`[StateMachine] Unknown action: ${actionName}`);
       return;
     }
 
     // 检查状态是否存在
     const actionState = this.config.states.get(actionStateID);
     if (!actionState) {
-      console.warn(`[StateMachine] Action state not configured: ${actionStateID}`);
       return;
     }
 
@@ -909,7 +874,6 @@ export class VirtualCharacterStateMachine {
       try {
         listener(event);
       } catch (e) {
-        console.error('[StateMachine] Listener error:', e);
       }
     });
   }
@@ -951,7 +915,6 @@ export class VirtualCharacterStateMachine {
       try {
         await activeBuffer.element.play();
       } catch (e) {
-        console.warn('[StateMachine] Play failed:', e);
       }
     }
   }

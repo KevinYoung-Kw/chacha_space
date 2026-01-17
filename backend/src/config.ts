@@ -29,6 +29,12 @@ export const config = {
     baseUrl: 'https://restapi.amap.com/v3',
   },
   
+  // 阶跃星辰 API
+  stepfun: {
+    apiKey: process.env.STEPFUN_API_KEY || '',
+    baseUrl: 'https://api.stepfun.com',
+  },
+  
   // 数据库配置
   database: {
     path: process.env.DATABASE_PATH || path.resolve(__dirname, '../data/chacha.db'),
