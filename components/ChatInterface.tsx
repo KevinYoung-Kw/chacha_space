@@ -7,7 +7,8 @@ interface ChatInterfaceProps {
   messages: Message[];
   isListening: boolean;
   onSendMessage: (text: string) => void;
-  onToggleListening: () => void;
+  onStartListening: () => void;
+  onStopListening: () => void;
   inputRef: React.RefObject<HTMLInputElement>;
 }
 
@@ -15,7 +16,8 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   messages, 
   isListening, 
   onSendMessage, 
-  onToggleListening,
+  onStartListening,
+  onStopListening,
   inputRef 
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -36,6 +38,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     if (inputRef.current?.value) {
         onSendMessage(inputRef.current.value);
         inputRef.current.value = '';
+    }
+  };
+
+  // 点击切换模式：第一次点击开始，第二次点击停止
+  const handleVoiceButtonClick = () => {
+    if (isListening) {
+      // 正在录音，点击停止
+      onStopListening();
+    } else {
+      // 未录音，点击开始
+      onStartListening();
     }
   };
 
@@ -74,7 +87,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 ref={inputRef}
                 type="text"
                 placeholder=""
-                className="w-full h-full px-3 bg-transparent rounded-full focus:outline-none text-[#5c4d43] text-sm font-medium placeholder-[#a89b8c]"
+                disabled={isListening}
+                className={`w-full h-full px-3 bg-transparent rounded-full focus:outline-none text-sm font-medium placeholder-[#a89b8c] transition-opacity ${
+                  isListening 
+                    ? 'opacity-50 cursor-not-allowed text-[#8b7b6d]' 
+                    : 'text-[#5c4d43]'
+                }`}
                 onKeyDown={handleKeyDown}
               />
           </div>
@@ -86,25 +104,42 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                   <>
                      <div className="absolute inset-0 bg-rose-400 rounded-full blur-md opacity-40 animate-pulse pointer-events-none"></div>
                      <div className="absolute inset-0 bg-rose-300 rounded-full animate-ping opacity-50 pointer-events-none"></div>
+                     {/* 长期等待状态提示 */}
+                     <div className="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap bg-rose-500 text-white text-[10px] px-2 py-1 rounded-full shadow-lg animate-bounce flex items-center gap-1">
+                        <span className="w-1 h-1 bg-white rounded-full animate-pulse"></span>
+                        正在倾听...
+                     </div>
                   </>
               )}
               
               <button 
-                  onClick={onToggleListening}
-                  className={`toolbar-btn w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 z-10 active:scale-95 ${
+                  onClick={handleVoiceButtonClick}
+                  className={`toolbar-btn w-9 h-9 rounded-full flex items-center justify-center transition-all duration-300 z-10 active:scale-95 select-none ${
                       isListening 
-                      ? 'bg-rose-500 text-white scale-110' 
-                      : 'text-[#8b7b6d] hover:text-[#5c4d43] hover:bg-[#e6ddd0]'
+                      ? 'bg-rose-500 text-white scale-110 cursor-pointer shadow-[0_0_15px_rgba(244,63,94,0.5)]' 
+                      : 'text-[#8b7b6d] hover:text-[#5c4d43] hover:bg-[#e6ddd0] cursor-pointer'
                   }`}
+                  style={{ touchAction: 'none', userSelect: 'none' }}
+                  title={isListening ? '点击停止录音' : '点击开始录音'}
               >
-                  {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+                  {isListening ? (
+                    <div className="relative flex items-center justify-center">
+                      <MicOff size={18} />
+                      <span className="absolute -inset-1 rounded-full border-2 border-white/30 animate-ping"></span>
+                    </div>
+                  ) : <Mic size={18} />}
               </button>
           </div>
 
           {/* Send Button */}
           <button 
               onClick={handleSendClick}
-              className="toolbar-btn w-9 h-9 rounded-full text-[#8b7b6d] hover:text-[#5c4d43] hover:bg-[#e6ddd0] flex items-center justify-center transition-all active:scale-95"
+              disabled={isListening}
+              className={`toolbar-btn w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-95 ${
+                isListening
+                  ? 'opacity-50 cursor-not-allowed text-[#8b7b6d]'
+                  : 'text-[#8b7b6d] hover:text-[#5c4d43] hover:bg-[#e6ddd0] cursor-pointer'
+              }`}
           >
               <Send size={18} />
           </button>

@@ -6,9 +6,7 @@
 
 import React, { useMemo } from 'react';
 import { Heart, TrendingUp, TrendingDown, X, Calendar, Activity } from 'lucide-react';
-import { AffinityData, AffinityLevel } from '../types';
-import { getAffinityStats, getLevelName, AFFINITY_LEVELS } from '../services/affinityService';
-import { getAffinityCalculationDetails } from '../services/affinityValidator';
+import { AffinityData } from '../types';
 import AffinityIndicator from './AffinityIndicator';
 
 interface AffinityDetailPanelProps {
@@ -17,9 +15,6 @@ interface AffinityDetailPanelProps {
 }
 
 const AffinityDetailPanel: React.FC<AffinityDetailPanelProps> = ({ affinity, onClose }) => {
-  const stats = getAffinityStats(affinity);
-  const calcDetails = getAffinityCalculationDetails(affinity);
-
   // 按日期分组历史记录
   const groupedHistory = useMemo(() => {
     const groups: Record<string, typeof affinity.history> = {};
@@ -117,25 +112,6 @@ const AffinityDetailPanel: React.FC<AffinityDetailPanelProps> = ({ affinity, onC
             <div className="text-xs text-gray-500 mt-1">总互动次数</div>
           </div>
         </div>
-        
-        {/* 积分验证信息 */}
-        <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
-          <div className="text-xs text-gray-600 space-y-1">
-            <div className="font-semibold mb-2 text-blue-800">积分计算验证：</div>
-            <div>当前积分：<span className="font-bold text-blue-700">{affinity.value}</span> / 1000</div>
-            <div>当前等级：<span className="font-bold text-blue-700">{stats.level.toUpperCase()} · {getLevelName(stats.level)}</span></div>
-            <div>等级范围：{calcDetails.levelRange.min} - {calcDetails.levelRange.max} 积分</div>
-            <div>当前进度：{stats.progress}% （还需 {stats.nextLevelThreshold ? stats.nextLevelThreshold - affinity.value : 0} 积分升级）</div>
-            <div className="pt-2 border-t border-blue-200 mt-2">
-              <div className="text-[10px] text-gray-500">计算详情：</div>
-              <div>历史记录总和：{calcDetails.historySum > 0 ? '+' : ''}{calcDetails.historySum}</div>
-              <div>预期积分：{calcDetails.expectedValue}（初始50 + 历史变化）</div>
-              {calcDetails.difference > 1 && (
-                <div className="text-red-600 font-semibold">⚠️ 差异：{calcDetails.difference} 积分</div>
-              )}
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* 历史记录 - 可滚动查看 */}
@@ -151,17 +127,15 @@ const AffinityDetailPanel: React.FC<AffinityDetailPanelProps> = ({ affinity, onC
             <p className="text-sm">还没有互动记录</p>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4">
             {Object.entries(groupedHistory).map(([date, events]) => (
-              <div key={date} className="space-y-2">
-                {/* 日期标题 */}
-                <div className="flex items-center gap-2 mb-3">
+              <details key={date} className="rounded-xl border border-gray-200 bg-white">
+                <summary className="flex items-center gap-2 px-3 py-2 cursor-pointer select-none">
                   <Calendar size={14} className="text-gray-400" />
                   <span className="text-xs font-semibold text-gray-500">{date}</span>
-                </div>
-
-                {/* 事件列表 */}
-                <div className="space-y-2">
+                  <span className="ml-auto text-[10px] text-gray-400">收起/展开</span>
+                </summary>
+                <div className="space-y-2 px-3 pb-3">
                   {events.map((event, index) => {
                     const isPositive = event.change > 0;
                     return (
@@ -218,7 +192,7 @@ const AffinityDetailPanel: React.FC<AffinityDetailPanelProps> = ({ affinity, onC
                     );
                   })}
                 </div>
-              </div>
+              </details>
             ))}
           </div>
         )}

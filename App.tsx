@@ -45,6 +45,45 @@ const App: React.FC = () => {
   
   // Voice State - 固定使用 Korean_ThoughtfulWoman
   const currentVoiceId = 'Korean_ThoughtfulWoman';
+
+  // 动作语音文本映射（不超过10个字，具有互动性）
+  const actionVoiceMap: Record<string, string> = {
+    // 待机动作
+    'idle_alt': '我在等你呢',
+    'idle_1': '随时为你服务',
+    'idle_3': '我准备好啦',
+    'listening_v2': '我在认真听你说',
+    
+    // 正面情绪
+    'happy': '和你在一起好开心',
+    'excited': '太棒了',
+    'jump': '好开心呀',
+    'wave': '你好呀',
+    'nod': '我同意你的想法',
+    
+    // 负面情绪
+    'crying': '需要你安慰我',
+    'shy': '有点不好意思',
+    'scared': '我好害怕',
+    'angry': '你惹我生气了',
+    'angry_cross': '我真的很生气',
+    'rage': '气死我了',
+    'disapprove': '我不认可这个',
+    'shouting': '你听到了吗',
+    
+    // 活动状态
+    'sleeping': '我要去睡觉了',
+    'singing': '为你唱首歌',
+    'listening': '音乐真好听',
+    'listening_music': '一起听音乐吧',
+    'phone': '让我看看手机',
+    'check_phone': '看看有什么消息',
+    'notes': '让我记下来',
+    
+    // 交互动作
+    'speaking': '我想对你说',
+    'thinking': '让我想想',
+  };
   
   // Micro-interaction State
   const [hasNewTodo, setHasNewTodo] = useState(false);
@@ -60,7 +99,13 @@ const App: React.FC = () => {
   const [categories, setCategories] = useState<TodoCategory[]>([]);
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [weather, setWeather] = useState<WeatherData | null>(null);
+  const isListeningRef = useRef(false);
   const [isListening, setIsListening] = useState(false);
+  
+  // 同步 ref 和 state
+  useEffect(() => {
+    isListeningRef.current = isListening;
+  }, [isListening]);
   
   // Health Data State
   const [healthData, setHealthData] = useState<{
@@ -116,6 +161,10 @@ const App: React.FC = () => {
 
   // --- Refs ---
   const recognitionRef = useRef<any>(null);
+  const silenceTimerRef = useRef<number | null>(null);
+  const hasSpeechResultRef = useRef(false);
+  const isManuallyStoppingRef = useRef(false); // 记录是否是用户手动停止
+  const silenceTimeoutMs = 5000;
   const audioContextRef = useRef<AudioContext | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const weatherFetchedRef = useRef<boolean>(false);
@@ -377,25 +426,146 @@ const App: React.FC = () => {
   }, [user]);
 
   // --- 语音识别设置 ---
+  const clearSilenceTimer = () => {
+    if (silenceTimerRef.current) {
+      window.clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+  };
+
+  // 初始化语音识别（只初始化一次）
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
-      recognition.continuous = false;
+      recognition.continuous = true; // 连续模式，直到手动停止
+      recognition.interimResults = false; // 只返回最终结果
       recognition.lang = 'zh-CN';
-      recognition.onstart = () => { setIsListening(true); setState(AssistantState.LISTENING); };
-      recognition.onend = () => { setIsListening(false); if (state === AssistantState.LISTENING) setState(AssistantState.IDLE); };
-      recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        if (transcript) processInput(transcript);
+      
+      // 用于累积识别结果
+      const transcriptParts: string[] = [];
+      
+      recognition.onstart = () => {
+        transcriptParts.length = 0; // 清空之前的结果
+        hasSpeechResultRef.current = false;
+        isManuallyStoppingRef.current = false; // 重置手动停止标志
+        setIsListening(true);
+        setState(AssistantState.LISTENING);
+        clearSilenceTimer();
       };
+      
+      recognition.onend = () => {
+        // 如果不是手动停止，且仍处于监听状态（说明是由于静音等原因自动结束），则尝试重新启动以维持“长期等待状态”
+        if (!isManuallyStoppingRef.current && isListeningRef.current) {
+          try {
+            recognition.start();
+            return; // 跳过后续逻辑，继续等待
+          } catch (e) {
+            console.error('[SpeechRecognition] Restart error:', e);
+          }
+        }
+
+        clearSilenceTimer();
+        setIsListening(false);
+        setState((prevState) => prevState === AssistantState.LISTENING ? AssistantState.IDLE : prevState);
+        
+        // 如果有识别结果，填入输入框
+        if (transcriptParts.length > 0 && hasSpeechResultRef.current) {
+          const fullTranscript = transcriptParts.join(' ').trim();
+          if (fullTranscript && inputRef.current) {
+            const currentValue = inputRef.current.value || '';
+            const newValue = currentValue ? `${currentValue} ${fullTranscript}` : fullTranscript;
+            inputRef.current.value = newValue;
+            // 触发 input 事件，确保 React 能感知到变化
+            const inputEvent = new Event('input', { bubbles: true });
+            inputRef.current.dispatchEvent(inputEvent);
+            // 聚焦输入框
+            inputRef.current.focus();
+          }
+        }
+      };
+      
+      recognition.onerror = (event: any) => {
+        console.error('[SpeechRecognition] Error:', event.error);
+        clearSilenceTimer();
+        setIsListening(false);
+        setState((prevState) => prevState === AssistantState.LISTENING ? AssistantState.IDLE : prevState);
+        // 如果是用户取消，不显示错误
+        if (event.error !== 'no-speech' && event.error !== 'aborted') {
+          console.warn('[SpeechRecognition] Error:', event.error);
+        }
+      };
+      
+      recognition.onresult = (event: any) => {
+        hasSpeechResultRef.current = true;
+        // 累积所有识别结果
+        for (let i = 0; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (transcript && transcript.trim()) {
+            transcriptParts.push(transcript.trim());
+          }
+        }
+      };
+      
       recognitionRef.current = recognition;
     }
-  }, [state]);
+    
+    return () => {
+      clearSilenceTimer();
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          // 忽略停止时的错误
+        }
+      }
+    };
+  }, []); // 只在组件挂载时初始化一次
 
-  const toggleListening = useCallback(() => {
-    if (isListening) recognitionRef.current?.stop();
-    else recognitionRef.current?.start();
+  const startListening = useCallback(() => {
+    if (!recognitionRef.current) {
+      console.warn('[SpeechRecognition] Not available');
+      return;
+    }
+    
+    if (isListening) {
+      return; // 已经在监听中
+    }
+    
+    try {
+      recognitionRef.current.start();
+    } catch (error: any) {
+      // 如果已经在运行，忽略错误
+      if (error.name !== 'InvalidStateError') {
+        console.error('[SpeechRecognition] Start error:', error);
+      }
+    }
+  }, [isListening]);
+
+  const stopListening = useCallback(() => {
+    if (!recognitionRef.current) {
+      return;
+    }
+    
+    // 如果不在监听状态，直接返回
+    if (!isListening) {
+      return;
+    }
+    
+    try {
+      isManuallyStoppingRef.current = true; // 标记为手动停止
+      clearSilenceTimer();
+      // 停止识别，onend 事件会自动处理状态重置
+      recognitionRef.current.stop();
+    } catch (error: any) {
+      // 如果识别已经停止，忽略错误
+      if (error.name !== 'InvalidStateError') {
+        console.error('[SpeechRecognition] Stop error:', error);
+      }
+      // 即使出错也要重置状态
+      setIsListening(false);
+      setState((prevState) => prevState === AssistantState.LISTENING ? AssistantState.IDLE : prevState);
+    }
   }, [isListening]);
 
   // 缓存视频人物配置（避免每次渲染都重新创建）
@@ -564,7 +734,8 @@ const App: React.FC = () => {
                 messages={messages}
                 isListening={isListening}
                 onSendMessage={processInput}
-                onToggleListening={toggleListening}
+                onStartListening={startListening}
+                onStopListening={stopListening}
                 inputRef={inputRef}
               />
             </div>
@@ -640,6 +811,11 @@ const App: React.FC = () => {
                     <AnimationPanel 
                       onPlayAnimation={(actionName) => {
                         videoAvatarRef.current?.playAction(actionName);
+                        // 播放对应的语音
+                        const voiceText = actionVoiceMap[actionName];
+                        if (voiceText) {
+                          speak(voiceText);
+                        }
                       }}
                     />
                   )}
