@@ -14,7 +14,7 @@ import { generateAssistantResponse } from './services/geminiService';
 import { generateSpeech } from './services/minimaxService';
 import { decodeAudioData, playAudioBuffer } from './services/audioService';
 import { getWeatherByLocation, getWeatherByIP } from './services/weatherService';
-import { CloudSun, Sparkles, Notebook, Zap, Settings, X, Bell, Clock, Mic2, Activity } from 'lucide-react';
+import { CloudSun, Sparkles, Notebook, Zap, Settings, X, Bell, Clock, Mic2, Activity, CheckSquare, Calendar, Image, Phone } from 'lucide-react';
 
 // Panel Types
 type LeftPanelType = 'none' | 'info_weather' | 'info_fortune' | 'info_health';
@@ -65,6 +65,7 @@ const App: React.FC = () => {
   const recognitionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const weatherFetchedRef = useRef<boolean>(false); // 防止重复请求天气数据
 
   // --- Helpers ---
   const addMessage = (role: 'user' | 'assistant', content: string) => {
@@ -159,18 +160,30 @@ const App: React.FC = () => {
      const saved = localStorage.getItem('tata_profile');
      if (saved) setUserProfile(JSON.parse(saved));
 
-     const fetchWeather = async () => {
-         // 1. Try IP first for speed
-         const ipWeatherData = await getWeatherByIP();
-         if (ipWeatherData) setWeather(ipWeatherData);
+     // 防止 React StrictMode 双重调用导致的重复请求
+     if (weatherFetchedRef.current) return;
+     weatherFetchedRef.current = true;
 
-         // 2. Try precise Geolocation
+     const fetchWeather = async () => {
+         // 优先使用浏览器精确定位（避免 IP API 限流）
          if (navigator.geolocation) {
-             navigator.geolocation.getCurrentPosition(async (position) => {
-                 const { latitude, longitude } = position.coords;
-                 const w = await getWeatherByLocation(latitude, longitude);
-                 if (w) setWeather(w);
-             }, (err) => console.warn("Geolocation permission denied or failed", err));
+             navigator.geolocation.getCurrentPosition(
+                 async (position) => {
+                     const { latitude, longitude } = position.coords;
+                     const w = await getWeatherByLocation(latitude, longitude);
+                     if (w) setWeather(w);
+                 }, 
+                 async (err) => {
+                     console.warn("Geolocation permission denied, trying IP-based location", err);
+                     // 仅在地理定位失败时才使用 IP API（降低请求频率）
+                     const ipWeatherData = await getWeatherByIP();
+                     if (ipWeatherData) setWeather(ipWeatherData);
+                 }
+             );
+         } else {
+             // 浏览器不支持地理定位时才使用 IP API
+             const ipWeatherData = await getWeatherByIP();
+             if (ipWeatherData) setWeather(ipWeatherData);
          }
      };
      fetchWeather();
@@ -209,8 +222,18 @@ const App: React.FC = () => {
 
   return (
     <div className="fixed inset-0 bg-[#fdfcf8] text-[#5c4d43] font-sans overflow-hidden selection:bg-[#e6dec8]">
-        {/* Background Texture Effect */}
-        <div className="absolute inset-0 opacity-50 pointer-events-none" style={{ backgroundImage: 'url("https://www.transparenttextures.com/patterns/cream-paper.png")' }}></div>
+        {/* Background Image */}
+        <div 
+          className="absolute inset-0 pointer-events-none"
+          style={{ 
+            backgroundImage: 'url("/images/background.webp")',
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat'
+          }}
+        ></div>
+        {/* Subtle overlay for readability */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#fdfcf8]/30 pointer-events-none"></div>
 
         {/* --- Center Stage (40-50% width) --- */}
         <div className="absolute inset-x-0 top-0 bottom-32 flex flex-col items-center justify-center z-10 pointer-events-none">
@@ -233,25 +256,31 @@ const App: React.FC = () => {
 
         {/* --- Left Panel (Information Board) --- */}
         <div className="absolute left-6 top-1/2 -translate-y-1/2 z-30 flex flex-row items-center gap-4">
-            {/* Icons Column - Objective Info */}
-            <div className="flex flex-col gap-6">
-                <GlassIcon 
-                    icon={<CloudSun size={24} />} 
-                    active={leftPanel === 'info_weather'} 
-                    onClick={() => setLeftPanel(leftPanel === 'info_weather' ? 'none' : 'info_weather')}
-                    label="时空信息"
-                />
-                <GlassIcon 
-                    icon={<Activity size={24} />} 
+            {/* Icons Column - Styled like image */}
+            <div className="flex flex-col gap-3">
+                <ToolbarIcon 
+                    icon={<CheckSquare size={22} />} 
                     active={leftPanel === 'info_health'} 
                     onClick={() => setLeftPanel(leftPanel === 'info_health' ? 'none' : 'info_health')}
-                    label="身体状态"
+                    label="待办"
                 />
-                <GlassIcon 
-                    icon={<Sparkles size={24} />} 
+                <ToolbarIcon 
+                    icon={<Calendar size={22} />} 
+                    active={leftPanel === 'info_weather'} 
+                    onClick={() => setLeftPanel(leftPanel === 'info_weather' ? 'none' : 'info_weather')}
+                    label="日程"
+                />
+                <ToolbarIcon 
+                    icon={<CloudSun size={22} />} 
+                    active={false} 
+                    onClick={() => {}}
+                    label="天气"
+                />
+                <ToolbarIcon 
+                    icon={<Zap size={22} />} 
                     active={leftPanel === 'info_fortune'} 
                     onClick={() => setLeftPanel(leftPanel === 'info_fortune' ? 'none' : 'info_fortune')}
-                    label="今日运势"
+                    label="技能"
                 />
             </div>
 
@@ -280,26 +309,36 @@ const App: React.FC = () => {
 
         {/* --- Right Panel (Productivity Center) --- */}
         <div className="absolute right-6 top-1/2 -translate-y-1/2 z-30 flex flex-row-reverse items-center gap-4">
-            {/* Icons Column - Memory & Skills */}
-            <div className="flex flex-col gap-6">
-                <GlassIcon 
-                    icon={<Notebook size={24} />} 
+            {/* Icons Column - Styled like image */}
+            <div className="flex flex-col gap-3">
+                <ToolbarIcon 
+                    icon={<Notebook size={22} />} 
                     active={rightPanel === 'prod_todo'} 
                     onClick={() => setRightPanel(rightPanel === 'prod_todo' ? 'none' : 'prod_todo')}
-                    label="日程规划"
+                    label="笔记"
                     notification={hasNewTodo}
+                    position="right"
                 />
-                <GlassIcon 
-                    icon={<Zap size={24} />} 
+                <ToolbarIcon 
+                    icon={<Image size={22} />} 
+                    active={false} 
+                    onClick={() => {}}
+                    label="相册"
+                    position="right"
+                />
+                <ToolbarIcon 
+                    icon={<Activity size={22} />} 
                     active={rightPanel === 'prod_skills'} 
                     onClick={() => setRightPanel(rightPanel === 'prod_skills' ? 'none' : 'prod_skills')}
-                    label="助手技能"
+                    label="活动"
+                    position="right"
                 />
-                <GlassIcon 
-                    icon={<Mic2 size={24} />} 
+                <ToolbarIcon 
+                    icon={<Settings size={22} />} 
                     active={rightPanel === 'prod_voice'} 
                     onClick={() => setRightPanel(rightPanel === 'prod_voice' ? 'none' : 'prod_voice')}
-                    label="音色工坊"
+                    label="设置"
+                    position="right"
                 />
             </div>
 
@@ -336,53 +375,40 @@ const App: React.FC = () => {
             />
         </div>
         
-        {/* --- Global Styles --- */}
-        <style>{`
-            /* Enhanced Glassmorphism */
-            .glass-panel-strong {
-                background: rgba(255, 255, 255, 0.45);
-                backdrop-filter: blur(24px);
-                -webkit-backdrop-filter: blur(24px);
-                box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
-            }
-            
-            .glass-icon {
-                background: rgba(255, 255, 255, 0.3);
-                backdrop-filter: blur(10px);
-                border: 1px solid rgba(255, 255, 255, 0.6);
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-            }
-            .glass-icon:hover {
-                background: rgba(255, 255, 255, 0.7);
-                transform: scale(1.05);
-                box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-            }
-            
-            /* Animations */
-            @keyframes slideInLeft {
-                from { opacity: 0; transform: translateX(-30px) scale(0.95); }
-                to { opacity: 1; transform: translateX(0) scale(1); }
-            }
-            .animate-slide-in-left { animation: slideInLeft 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-            
-            @keyframes slideInRight {
-                from { opacity: 0; transform: translateX(30px) scale(0.95); }
-                to { opacity: 1; transform: translateX(0) scale(1); }
-            }
-            .animate-slide-in-right { animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
-            
-            @keyframes shake {
-                0%, 100% { transform: translateX(0); }
-                25% { transform: translateX(-4px) rotate(-5deg); }
-                75% { transform: translateX(4px) rotate(5deg); }
-            }
-            .animate-shake { animation: shake 0.4s ease-in-out; }
-        `}</style>
+        {/* Global styles now loaded from /styles/main.css */}
     </div>
   );
 };
 
-// Helper Component for Sidebar Icons
+// Helper Component for Toolbar Icons (styled like the reference image)
+const ToolbarIcon = ({ icon, active, onClick, label, notification, position = 'left' }: { 
+  icon: React.ReactNode, 
+  active: boolean, 
+  onClick: () => void, 
+  label: string, 
+  notification?: boolean,
+  position?: 'left' | 'right'
+}) => (
+    <div className="relative group flex flex-col items-center">
+        <button 
+            onClick={onClick}
+            className={`toolbar-btn w-12 h-12 rounded-xl flex items-center justify-center ${
+              active ? 'active' : ''
+            } ${notification ? 'animate-shake' : ''}`}
+        >
+            {icon}
+            {notification && (
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-[#f5f0e8] shadow-sm"></span>
+            )}
+        </button>
+        {/* Label below icon */}
+        <span className={`toolbar-label ${active ? 'active' : ''}`}>
+            {label}
+        </span>
+    </div>
+);
+
+// Legacy GlassIcon (kept for compatibility)
 const GlassIcon = ({ icon, active, onClick, label, notification }: { icon: React.ReactNode, active: boolean, onClick: () => void, label: string, notification?: boolean }) => (
     <div className="relative group">
         <button 

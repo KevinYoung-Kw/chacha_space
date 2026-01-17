@@ -60,7 +60,7 @@ const Avatar: React.FC<AvatarProps> = ({ state, className, mode = 'full' }) => {
               {styleTag}
               {/* Character Image - using object-contain to show full body */}
               <img 
-                  src="tata_avatar.png" 
+                  src="/images/character.png" 
                   onError={(e) => {
                       // Fallback if local image fails
                       e.currentTarget.src = "https://api.dicebear.com/9.x/avataaars/svg?seed=Tata&top=longHair&hairColor=e8e8e8&clothing=collarAndSweater&eyes=happy&mouth=smile&style=transparent";

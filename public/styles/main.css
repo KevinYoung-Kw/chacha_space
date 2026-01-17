@@ -1,0 +1,260 @@
+/**
+ * 叉叉 AI 助手 - 统一样式表
+ * 定义全局颜色、玻璃态效果、动画等
+ */
+
+/* ========================================
+   CSS 变量 - 主题色彩系统
+   ======================================== */
+:root {
+  /* 主色调 - 温暖米色系 */
+  --color-bg-base: #fdfcf8;
+  --color-bg-warm: #f5f0e8;
+  --color-bg-accent: #e6ddd0;
+  --color-bg-hover: #ede6dc;
+  
+  /* 文字色彩 */
+  --color-text-primary: #5c4d43;
+  --color-text-secondary: #8b7b6d;
+  --color-text-muted: #a89b8c;
+  
+  /* 边框色彩 */
+  --color-border-light: rgba(230, 221, 208, 0.6);
+  --color-border-subtle: rgba(230, 221, 208, 0.4);
+  
+  /* 强调色 */
+  --color-accent-rose: #f43f5e;
+  --color-accent-rose-light: #fb7185;
+  
+  /* 阴影 */
+  --shadow-soft: 0 4px 20px rgba(92, 77, 67, 0.08);
+  --shadow-medium: 0 8px 32px rgba(92, 77, 67, 0.12);
+  --shadow-strong: 0 12px 40px rgba(92, 77, 67, 0.15);
+  
+  /* 毛玻璃效果 */
+  --glass-bg: rgba(245, 240, 232, 0.85);
+  --glass-bg-strong: rgba(255, 255, 255, 0.45);
+  --glass-blur: 16px;
+  --glass-blur-strong: 24px;
+  
+  /* 圆角 */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 1.8rem;
+  --radius-3xl: 2.5rem;
+  --radius-full: 9999px;
+  
+  /* 过渡 */
+  --transition-fast: 150ms ease;
+  --transition-normal: 300ms ease;
+  --transition-smooth: 400ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ========================================
+   基础样式
+   ======================================== */
+body {
+  font-family: 'Quicksand', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--color-bg-base);
+  color: var(--color-text-primary);
+}
+
+::selection {
+  background-color: var(--color-bg-accent);
+}
+
+/* ========================================
+   毛玻璃效果 (Glassmorphism)
+   ======================================== */
+.glass-panel {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--color-border-light);
+  box-shadow: var(--shadow-soft);
+}
+
+.glass-panel-strong {
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(var(--glass-blur-strong));
+  -webkit-backdrop-filter: blur(var(--glass-blur-strong));
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: var(--shadow-medium);
+}
+
+.glass-icon {
+  background: rgba(255, 255, 255, 0.3);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.glass-icon:hover {
+  background: rgba(255, 255, 255, 0.7);
+  transform: scale(1.05);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* ========================================
+   工具栏按钮样式
+   ======================================== */
+.toolbar-btn {
+  background: transparent;
+  color: var(--color-text-secondary);
+  transition: all var(--transition-normal);
+}
+
+.toolbar-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.toolbar-btn.active {
+  background: var(--color-bg-accent);
+  color: var(--color-text-primary);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+}
+
+/* ========================================
+   对话框容器样式
+   ======================================== */
+.chat-container {
+  background: rgba(245, 240, 232, 0.25);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--color-border-light);
+  box-shadow: var(--shadow-soft);
+}
+
+/* ========================================
+   动画效果
+   ======================================== */
+
+/* 从左滑入 */
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+.animate-slide-in-left {
+  animation: slideInLeft var(--transition-smooth) forwards;
+}
+
+/* 从右滑入 */
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+.animate-slide-in-right {
+  animation: slideInRight var(--transition-smooth) forwards;
+}
+
+/* 抖动效果 */
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px) rotate(-5deg);
+  }
+  75% {
+    transform: translateX(4px) rotate(5deg);
+  }
+}
+.animate-shake {
+  animation: shake 0.4s ease-in-out;
+}
+
+/* 呼吸效果 */
+@keyframes breathe {
+  0%, 100% {
+    transform: scale(1) translateY(0);
+  }
+  50% {
+    transform: scale(1.03) translateY(-4px);
+  }
+}
+.animate-breathe {
+  animation: breathe 2.5s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* 慢速浮动 */
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+.animate-float-slow {
+  animation: float-slow 6s ease-in-out infinite;
+  will-change: transform;
+}
+
+/* 向上淡入 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-in-up {
+  animation: fadeInUp 0.3s ease-out forwards;
+}
+
+/* 动画延迟 */
+.animation-delay-100 {
+  animation-delay: 100ms;
+}
+.animation-delay-200 {
+  animation-delay: 200ms;
+}
+.animation-delay-300 {
+  animation-delay: 300ms;
+}
+
+/* ========================================
+   滚动条隐藏
+   ======================================== */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ========================================
+   工具栏图标标签
+   ======================================== */
+.toolbar-label {
+  font-size: 11px;
+  margin-top: 4px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  transition: color var(--transition-fast);
+}
+
+.toolbar-label.active {
+  color: var(--color-text-primary);
+}

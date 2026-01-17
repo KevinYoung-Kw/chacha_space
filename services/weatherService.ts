@@ -116,14 +116,35 @@ export const getWeatherByLocation = async (lat: number, lng: number): Promise<We
 export const getWeatherByIP = async (): Promise<WeatherData | null> => {
   try {
       // Use ipapi.co for IP-based location (Free tier, HTTPS, CORS friendly)
-      const ipRes = await fetch('https://ipapi.co/json/');
+      const ipRes = await fetch('https://ipapi.co/json/', {
+          // 添加超时和错误处理
+          signal: AbortSignal.timeout(5000) // 5秒超时
+      });
+      
+      // 检查响应状态
+      if (!ipRes.ok) {
+          console.warn(`IP API returned status ${ipRes.status}: ${ipRes.statusText}`);
+          return null;
+      }
+      
       const ipData = await ipRes.json();
+      
       if (ipData.city) {
           // Use the city name from IP to get full weather data
           return await getWeatherForCity(ipData.city);
+      } else if (ipData.latitude && ipData.longitude) {
+          // 如果有经纬度但没有城市名，直接使用经纬度
+          return await getWeatherByLocation(ipData.latitude, ipData.longitude);
       }
-  } catch (e) {
-      console.warn("IP Geo failed", e);
+  } catch (e: any) {
+      // 更详细的错误信息
+      if (e.name === 'TimeoutError') {
+          console.warn("IP Geo request timeout");
+      } else if (e.name === 'AbortError') {
+          console.warn("IP Geo request aborted");
+      } else {
+          console.warn("IP Geo failed:", e.message || e);
+      }
   }
   return null;
 };
