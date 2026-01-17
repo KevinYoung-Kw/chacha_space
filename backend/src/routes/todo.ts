@@ -120,7 +120,7 @@ router.put('/:id', (req: Request, res: Response<ApiResponse<TodoItem>>) => {
   try {
     const userId = req.user!.userId;
     const todoId = req.params.id;
-    const { text, priority, category, deadline, completed } = req.body;
+    const { text, priority, categoryId, deadline, completed } = req.body;
 
     // 验证所有权
     const existing = db.prepare(`
@@ -135,17 +135,30 @@ router.put('/:id', (req: Request, res: Response<ApiResponse<TodoItem>>) => {
       UPDATE todos 
       SET text = COALESCE(?, text),
           priority = COALESCE(?, priority),
-          category = COALESCE(?, category),
+          category_id = COALESCE(?, category_id),
           deadline = COALESCE(?, deadline),
           completed = COALESCE(?, completed),
           updated_at = datetime('now')
       WHERE id = ?
-    `).run(text, priority, category, deadline, completed !== undefined ? (completed ? 1 : 0) : null, todoId);
+    `).run(text, priority, categoryId, deadline, completed !== undefined ? (completed ? 1 : 0) : null, todoId);
 
     const todo = db.prepare(`
-      SELECT id, user_id as userId, text, completed, category, priority, deadline,
-             created_at as createdAt, updated_at as updatedAt
-      FROM todos WHERE id = ?
+      SELECT 
+        t.id, 
+        t.user_id as userId, 
+        t.text, 
+        t.completed, 
+        t.category_id as categoryId,
+        c.name as categoryName,
+        c.icon as categoryIcon,
+        c.color as categoryColor,
+        t.priority, 
+        t.deadline,
+        t.created_at as createdAt, 
+        t.updated_at as updatedAt
+      FROM todos t
+      LEFT JOIN todo_categories c ON t.category_id = c.id
+      WHERE t.id = ?
     `).get(todoId) as TodoItem;
 
     res.json({ success: true, data: todo });
@@ -174,9 +187,22 @@ router.patch('/:id/toggle', (req: Request, res: Response<ApiResponse<TodoItem>>)
     }
 
     const todo = db.prepare(`
-      SELECT id, user_id as userId, text, completed, category, priority, deadline,
-             created_at as createdAt, updated_at as updatedAt
-      FROM todos WHERE id = ?
+      SELECT 
+        t.id, 
+        t.user_id as userId, 
+        t.text, 
+        t.completed, 
+        t.category_id as categoryId,
+        c.name as categoryName,
+        c.icon as categoryIcon,
+        c.color as categoryColor,
+        t.priority, 
+        t.deadline,
+        t.created_at as createdAt, 
+        t.updated_at as updatedAt
+      FROM todos t
+      LEFT JOIN todo_categories c ON t.category_id = c.id
+      WHERE t.id = ?
     `).get(todoId) as TodoItem;
 
     res.json({ success: true, data: todo });

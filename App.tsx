@@ -492,6 +492,13 @@ const App: React.FC = () => {
           </button>
         </div>
 
+        {/* 版本号 - 右下角 */}
+        <div className="absolute bottom-4 right-6 z-50">
+          <div className="text-[10px] sm:text-[11px] text-[#a89b8c] font-mono opacity-60 hover:opacity-100 transition-opacity">
+            v1.0.0
+          </div>
+        </div>
+
         {/* === 主布局容器 === */}
         <div className="relative h-full w-full flex">
           
@@ -532,9 +539,7 @@ const App: React.FC = () => {
                 ${hasPanelOpen ? 'max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg' : 'max-w-sm md:max-w-md lg:max-w-lg'}
               `}
               style={{
-                transform: hasPanelOpen 
-                  ? (isSmallScreen ? 'scale(1.375)' : 'scale(1.265)') 
-                  : (isSmallScreen ? 'scale(1.25)' : 'scale(1.15)'),
+                transform: isSmallScreen ? 'scale(1.45)' : 'scale(1.35)',
                 transformOrigin: 'center bottom'
               }}
             >
@@ -576,7 +581,7 @@ const App: React.FC = () => {
           `} style={{ overflow: 'hidden' }}>
             {hasPanelOpen && (
               <div className={`
-                w-[360px] sm:w-[420px] md:w-[460px] lg:w-[480px] h-[88vh] max-h-[750px] 
+                w-[360px] sm:w-[420px] md:w-[460px] lg:w-[480px] h-[84vh] max-h-[720px] 
                 flex-shrink-0 transition-all duration-500 ease-out
                 ${hasPanelOpen ? 'translate-x-0 opacity-100' : 'translate-x-12 opacity-0'}
               `}>

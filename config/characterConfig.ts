@@ -73,6 +73,11 @@ const VIDEO_PATHS = {
   IDLE_ALT: '/character/idle_alt.webm',
   IDLE_ACTION_1: '/character/idle_action_1.webm',
   IDLE_ACTION_3: '/character/idle_action_3.webm',
+  
+  // 交互动作（使用现有视频作为替代）
+  ACTION_THINKING: '/character/taking_notes.webm',  // 思考时记笔记
+  ACTION_WAVE: '/character/happy.webm',              // 挥手用开心
+  ACTION_NOD: '/character/happy.webm',               // 点头用开心
 } as const;
 
 /**
@@ -223,6 +228,11 @@ export function createEmotionalConfig(): StateMachineConfig {
     { id: 'ACTION_IDLE_ALT', video: VIDEO_PATHS.IDLE_ALT },
     { id: 'ACTION_IDLE_1', video: VIDEO_PATHS.IDLE_ACTION_1 },
     { id: 'ACTION_IDLE_3', video: VIDEO_PATHS.IDLE_ACTION_3 },
+    
+    // 交互动作
+    { id: 'ACTION_THINKING', video: VIDEO_PATHS.ACTION_THINKING },
+    { id: 'ACTION_WAVE', video: VIDEO_PATHS.ACTION_WAVE },
+    { id: 'ACTION_NOD', video: VIDEO_PATHS.ACTION_NOD },
   ];
    
   // 添加所有情绪动作到状态机
