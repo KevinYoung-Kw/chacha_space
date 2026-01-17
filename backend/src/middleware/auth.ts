@@ -84,8 +84,8 @@ export const optionalAuthMiddleware = (
  */
 export const generateToken = (payload: { userId: string; email: string }): string => {
   return jwt.sign(payload, config.jwtSecret, {
-    expiresIn: config.jwtExpiresIn,
-  });
+    expiresIn: config.jwtExpiresIn as string | number,
+  } as jwt.SignOptions);
 };
 
 export default authMiddleware;

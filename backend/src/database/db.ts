@@ -11,7 +11,7 @@ if (!fs.existsSync(dataDir)) {
 }
 
 // 创建数据库连接
-const db = new Database(config.database.path, {
+const db: Database.Database = new Database(config.database.path, {
   verbose: config.nodeEnv === 'development' ? console.log : undefined,
 });
 

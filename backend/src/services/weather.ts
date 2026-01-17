@@ -27,7 +27,7 @@ export async function getWeatherForCity(city: string): Promise<WeatherData | nul
     // 1. 地理编码
     const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=zh&format=json`;
     const geoRes = await fetch(geoUrl);
-    const geoData = await geoRes.json();
+    const geoData = await geoRes.json() as any;
 
     if (!geoData.results || geoData.results.length === 0) {
       console.warn("City not found:", city);
@@ -39,7 +39,7 @@ export async function getWeatherForCity(city: string): Promise<WeatherData | nul
     // 2. 获取天气数据
     const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`;
     const weatherRes = await fetch(weatherUrl);
-    const weatherData = await weatherRes.json();
+    const weatherData = await weatherRes.json() as any;
 
     const current = weatherData.current;
     const daily = weatherData.daily;
@@ -87,7 +87,7 @@ export async function getWeatherByLocation(lat: number, lng: number): Promise<We
   try {
     const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`;
     const weatherRes = await fetch(weatherUrl);
-    const weatherData = await weatherRes.json();
+    const weatherData = await weatherRes.json() as any;
 
     const current = weatherData.current;
     const daily = weatherData.daily;
@@ -130,7 +130,7 @@ export async function getWeatherByIP(): Promise<WeatherData | null> {
 
     if (!ipRes.ok) return null;
 
-    const ipData = await ipRes.json();
+    const ipData = await ipRes.json() as any;
 
     if (ipData.city) {
       return await getWeatherForCity(ipData.city);

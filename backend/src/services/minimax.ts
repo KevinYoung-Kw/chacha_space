@@ -303,7 +303,7 @@ export async function generateChatResponse(
       return { content: "呜...时间线好像出了点小波动，稍后再试试吧~", toolCalls: [] };
     }
 
-    const data = await response.json();
+    const data = await response.json() as any;
     
     if (data.base_resp?.status_code !== 0) {
       console.error("MiniMax API Error:", data.base_resp?.status_msg);
@@ -387,7 +387,7 @@ export async function generateFinalResponse(
 
     if (!response.ok) return "搞定啦！";
 
-    const data = await response.json();
+    const data = await response.json() as any;
     return data.choices?.[0]?.message?.content || "搞定啦！";
 
   } catch (error) {
@@ -439,7 +439,7 @@ export async function generateSpeech(text: string, voiceId?: string): Promise<Ar
 
     if (!response.ok) return null;
 
-    const data = await response.json();
+    const data = await response.json() as any;
     
     if (data.base_resp?.status_code !== 0) return null;
 
