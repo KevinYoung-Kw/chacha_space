@@ -38,10 +38,10 @@ import { VideoStateID, VideoState, StateMachineConfig } from '../services/charac
 const VIDEO_PATHS = {
   // 基础状态
   IDLE_CENTER: '/character/idle_action_1.webm',  // 使用 idle_action_1.webm 作为主待机
-  TRANS_C2L: '/character/action_2.webm',
-  IDLE_LEFT: '/character/action_3.webm',
-  TRANS_L2C: '/character/action_4.webm',
-  ACTION_SPEAKING: '/character/action_5.webm',
+  TRANS_C2L: '/character/idle_action_1.webm',      // 过渡动画：重用待机动画
+  IDLE_LEFT: '/character/idle_action_3.webm',      // 左侧待机
+  TRANS_L2C: '/character/idle_action_1.webm',      // 过渡动画：重用待机动画
+  ACTION_SPEAKING: '/character/happy.webm',         // 使用happy.webm作为说话动作
   
   // 默认待机
   IDLE_DEFAULT: '/character/idle_action_1.webm',
@@ -78,6 +78,31 @@ const VIDEO_PATHS = {
   ACTION_THINKING: '/character/taking_notes.webm',  // 思考时记笔记
   ACTION_WAVE: '/character/happy.webm',              // 挥手用开心
   ACTION_NOD: '/character/happy.webm',               // 点头用开心
+  
+  // 新增：天气相关
+  ACTION_WEATHER: '/character/weather.webm',
+  
+  // 新增：技能相关
+  ACTION_SKILL: '/character/skill.webm',
+  
+  // 新增：风相关
+  ACTION_WIND_BLOWING: '/character/wind_blowing.webm',
+  ACTION_STRONG_WIND: '/character/strong_wind.webm',
+  ACTION_WIND_BLOWING_2: '/character/wind_blowing_2.webm',
+  
+  // 新增：跳舞相关
+  ACTION_DANCING: '/character/dancing.webm',
+  ACTION_DANCING_2: '/character/dancing_2.webm',
+  
+  // 新增：塔罗相关
+  ACTION_TAROT_READING: '/character/tarot_reading.webm',
+  
+  // 新增：其他动作
+  ACTION_SLEEPING_LONG: '/character/sleeping_long.webm',
+  ACTION_SURPRISED_OBSERVE: '/character/surprised_observe.webm',
+  ACTION_DRINKING_WATER: '/character/drinking_water.webm',
+  ACTION_OBSERVING: '/character/observing.webm',
+  IDLE_ACTION_4: '/character/idle_action_4.webm',
 } as const;
 
 /**
@@ -93,14 +118,14 @@ const VIDEO_PATHS = {
 export function createCustomConfig(): StateMachineConfig {
   const states = new Map<VideoStateID, VideoState>();
 
-  // ========== 待机状态（循环播放）==========
+  // ========== 待机状态（非循环，自动轮换）==========
   
-  // 中间待机
+  // 中间待机 - 不循环，播放完自动选择下一个待机动画
   states.set(VideoStateID.IDLE_CENTER, {
     stateID: VideoStateID.IDLE_CENTER,
     videoSource: VIDEO_PATHS.IDLE_CENTER,
-    isLoop: true,
-    nextStateID: null,
+    isLoop: false,  // 改为非循环，让待机动画自然轮换
+    nextStateID: null,  // 由状态机自动选择下一个待机动画
     preloadStates: [VideoStateID.TRANS_CENTER_TO_LEFT],
   });
 
@@ -233,15 +258,50 @@ export function createEmotionalConfig(): StateMachineConfig {
     { id: 'ACTION_THINKING', video: VIDEO_PATHS.ACTION_THINKING },
     { id: 'ACTION_WAVE', video: VIDEO_PATHS.ACTION_WAVE },
     { id: 'ACTION_NOD', video: VIDEO_PATHS.ACTION_NOD },
+    
+    // 天气相关
+    { id: 'ACTION_WEATHER', video: VIDEO_PATHS.ACTION_WEATHER },
+    
+    // 技能相关
+    { id: 'ACTION_SKILL', video: VIDEO_PATHS.ACTION_SKILL },
+    
+    // 风相关
+    { id: 'ACTION_WIND_BLOWING', video: VIDEO_PATHS.ACTION_WIND_BLOWING },
+    { id: 'ACTION_STRONG_WIND', video: VIDEO_PATHS.ACTION_STRONG_WIND },
+    { id: 'ACTION_WIND_BLOWING_2', video: VIDEO_PATHS.ACTION_WIND_BLOWING_2 },
+    
+    // 跳舞相关
+    { id: 'ACTION_DANCING', video: VIDEO_PATHS.ACTION_DANCING },
+    { id: 'ACTION_DANCING_2', video: VIDEO_PATHS.ACTION_DANCING_2 },
+    
+    // 塔罗相关
+    { id: 'ACTION_TAROT_READING', video: VIDEO_PATHS.ACTION_TAROT_READING },
+    
+    // 其他动作
+    { id: 'ACTION_SLEEPING_LONG', video: VIDEO_PATHS.ACTION_SLEEPING_LONG },
+    { id: 'ACTION_SURPRISED_OBSERVE', video: VIDEO_PATHS.ACTION_SURPRISED_OBSERVE },
+    { id: 'ACTION_DRINKING_WATER', video: VIDEO_PATHS.ACTION_DRINKING_WATER },
+    { id: 'ACTION_OBSERVING', video: VIDEO_PATHS.ACTION_OBSERVING },
+    { id: 'ACTION_IDLE_4', video: VIDEO_PATHS.IDLE_ACTION_4 },
   ];
    
   // 添加所有情绪动作到状态机
   emotionActions.forEach(({ id, video }) => {
+    // 待机动画不设置 nextStateID，让状态机自动选择下一个
+    const isIdleAnimation = id.includes('IDLE_') || id === 'ACTION_LISTENING_V2' || id === 'ACTION_OBSERVING';
+    
+    const nextState = isIdleAnimation ? null : VideoStateID.IDLE_CENTER;
+    
+    // 调试日志
+    if (isIdleAnimation) {
+      console.log(`[Config] Setting ${id} as idle animation (nextStateID: null)`);
+    }
+    
     states.set(id as VideoStateID, {
       stateID: id as VideoStateID,
       videoSource: video,
       isLoop: false,
-      nextStateID: VideoStateID.IDLE_CENTER,
+      nextStateID: nextState,
       preloadStates: [VideoStateID.IDLE_CENTER],
     });
   });
@@ -251,13 +311,26 @@ export function createEmotionalConfig(): StateMachineConfig {
     ...config,
     idleTimeout: {
       randomIdleDelay: 30000,   // 30秒无操作 -> 随机待机动画
-      sleepDelay: 120000,       // 2分钟无操作 -> 睡觉动画
+      sleepDelay: 120000,       // 2分钟无操作 -> 睡觉动画（会播放 sleeping 或 sleeping_long）
       randomIdleActions: [
-        'idle_alt',      // 备选待机
-        'idle_1',        // 待机动作1
-        'idle_3',        // 待机动作3
-        'listening_v2',  // 倾听
-        'check_phone',   // 查手机
+        // 待机变体
+        'idle_alt',         // 备选待机
+        'idle_1',           // 待机动作1
+        'idle_3',           // 待机动作3
+        'idle_4',           // 待机动作4 (新增)
+        
+        // 轻度活动
+        'listening_v2',     // 倾听
+        'observing',        // 观察 (新增)
+        'check_phone',      // 查手机
+        'phone',            // 玩手机
+        'notes',            // 记笔记
+        'drinking_water',   // 喝水 (新增)
+        
+        // 情绪动作
+        'thinking',         // 思考
+        'shy',              // 害羞
+        'surprised_observe', // 惊喜观察 (新增)
       ]
     }
   };

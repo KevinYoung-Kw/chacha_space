@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Play, Sparkles, Smile, Frown, Meh, Activity } from 'lucide-react';
+import { Play, Sparkles, Smile, Frown, Meh, Activity, Cloud, Zap, Wind, Music } from 'lucide-react';
 import { ANIMATION_ICONS } from './AnimationIcons';
 
 interface AnimationPanelProps {
@@ -23,7 +23,9 @@ const ANIMATION_CATEGORIES = {
       { name: 'idle_alt', label: '备选待机', description: '另一种待机姿态' },
       { name: 'idle_1', label: '待机动作1', description: '随机触发的小动作' },
       { name: 'idle_3', label: '待机动作3', description: '随机触发的小动作' },
+      { name: 'idle_4', label: '待机动作4', description: '随机触发的小动作' },
       { name: 'listening_v2', label: '倾听', description: '认真倾听的样子' },
+      { name: 'observing', label: '观察', description: '仔细观察' },
     ]
   },
   positive: {
@@ -62,11 +64,13 @@ const ANIMATION_CATEGORIES = {
     bgColor: 'bg-emerald-50',
     animations: [
       { name: 'sleeping', label: '睡觉', description: '休息睡眠' },
+      { name: 'sleeping_long', label: '深度睡眠', description: '长时间睡眠' },
       { name: 'singing', label: '唱歌', description: '快乐唱歌' },
       { name: 'listening', label: '听音乐', description: '享受音乐' },
       { name: 'phone', label: '玩手机', description: '使用手机' },
       { name: 'check_phone', label: '查手机', description: '查看信息' },
       { name: 'notes', label: '记笔记', description: '认真记录' },
+      { name: 'drinking_water', label: '喝水', description: '补充水分' },
     ]
   },
   interaction: {
@@ -77,6 +81,31 @@ const ANIMATION_CATEGORIES = {
     animations: [
       { name: 'speaking', label: '说话', description: '正在说话' },
       { name: 'thinking', label: '思考', description: '认真思考' },
+      { name: 'surprised_observe', label: '惊喜观察', description: '惊喜靠近观察' },
+    ]
+  },
+  weather: {
+    name: '天气相关',
+    icon: <Cloud size={18} />,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-50',
+    animations: [
+      { name: 'weather', label: '天气', description: '天气展示' },
+      { name: 'wind_blowing', label: '有风吹过', description: '微风吹拂' },
+      { name: 'strong_wind', label: '大风', description: '大风吹过' },
+      { name: 'wind_blowing_2', label: '风吹过2', description: '风吹效果2' },
+    ]
+  },
+  special: {
+    name: '特殊动作',
+    icon: <Zap size={18} />,
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-50',
+    animations: [
+      { name: 'skill', label: '技能', description: '展示技能' },
+      { name: 'tarot_reading', label: '塔罗占卜', description: '塔罗牌占卜' },
+      { name: 'dancing', label: '跳舞', description: '欢快舞蹈' },
+      { name: 'dancing_2', label: '跳舞2', description: '欢快舞蹈2' },
     ]
   }
 };

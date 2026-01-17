@@ -54,16 +54,48 @@ export enum VideoStateID {
   ACTION_PHONE = 'ACTION_PHONE',
   ACTION_CHECK_PHONE = 'ACTION_CHECK_PHONE',
   ACTION_NOTES = 'ACTION_NOTES',
+  
+  // 新增：天气相关
+  ACTION_WEATHER = 'ACTION_WEATHER',
+  
+  // 新增：技能相关
+  ACTION_SKILL = 'ACTION_SKILL',
+  
+  // 新增：风相关
+  ACTION_WIND_BLOWING = 'ACTION_WIND_BLOWING',
+  ACTION_STRONG_WIND = 'ACTION_STRONG_WIND',
+  ACTION_WIND_BLOWING_2 = 'ACTION_WIND_BLOWING_2',
+  
+  // 新增：跳舞相关
+  ACTION_DANCING = 'ACTION_DANCING',
+  ACTION_DANCING_2 = 'ACTION_DANCING_2',
+  
+  // 新增：塔罗相关
+  ACTION_TAROT_READING = 'ACTION_TAROT_READING',
+  
+  // 新增：其他动作
+  ACTION_SLEEPING_LONG = 'ACTION_SLEEPING_LONG',
+  ACTION_SURPRISED_OBSERVE = 'ACTION_SURPRISED_OBSERVE',
+  ACTION_DRINKING_WATER = 'ACTION_DRINKING_WATER',
+  ACTION_OBSERVING = 'ACTION_OBSERVING',
+  ACTION_IDLE_4 = 'ACTION_IDLE_4',
 }
 
 /** 可用的情绪/动作名称（用于 API 返回） */
 export type EmotionActionName = 
-  | 'idle' | 'idle_alt' | 'idle_1' | 'idle_3'
+  | 'idle' | 'idle_alt' | 'idle_1' | 'idle_3' | 'idle_4'
   | 'happy' | 'excited' | 'crying' | 'shy' | 'scared'
   | 'angry' | 'angry_cross' | 'rage' | 'disapprove' | 'shouting'
-  | 'sleeping' | 'listening' | 'listening_v2'
+  | 'sleeping' | 'sleeping_long' | 'listening' | 'listening_v2'
   | 'singing' | 'jump' | 'phone' | 'check_phone' | 'notes'
-  | 'speaking' | 'thinking' | 'wave' | 'nod';
+  | 'speaking' | 'thinking' | 'wave' | 'nod'
+  | 'weather'
+  | 'skill'
+  | 'wind_blowing' | 'strong_wind' | 'wind_blowing_2'
+  | 'dancing' | 'dancing_2'
+  | 'tarot_reading'
+  | 'surprised_observe' | 'drinking_water'
+  | 'observing';
 
 /** 视频状态对象 */
 export interface VideoState {
@@ -242,11 +274,13 @@ export class VirtualCharacterStateMachine {
       
       const idleTime = Date.now() - this.lastActivityTime;
       
-      // 超过睡觉延迟 -> 播放睡觉
+      // 超过睡觉延迟 -> 播放睡觉（随机选择普通睡觉或长睡眠）
       if (idleTime >= timeout.sleepDelay && !this.isInIdleMode) {
-        console.log('[StateMachine] Idle timeout reached, playing sleeping animation');
+        // 80% 概率播放普通睡觉，20% 概率播放长睡眠
+        const sleepAction = Math.random() < 0.8 ? 'sleeping' : 'sleeping_long';
+        console.log('[StateMachine] Idle timeout reached, playing sleeping animation:', sleepAction);
         this.isInIdleMode = true;
-        this.playAction('sleeping');
+        this.playAction(sleepAction);
       }
       // 超过随机待机延迟 -> 播放随机待机动画
       else if (idleTime >= timeout.randomIdleDelay && !this.isInIdleMode) {
@@ -345,6 +379,13 @@ export class VirtualCharacterStateMachine {
     // 监听错误事件
     video.addEventListener('error', (e) => {
       console.error(`[StateMachine] Video error in ${id}:`, e);
+      const buffer = id === 'buffer-a' ? this.bufferA : this.bufferB;
+      
+      // 标记视频加载失败，不要尝试重新加载（避免无限循环）
+      if (buffer) {
+        buffer.isReady = false;
+        console.error(`[StateMachine] Video load failed for ${buffer.currentState}, marked as not ready`);
+      }
     });
 
     // 监听加载元数据事件
@@ -451,7 +492,32 @@ export class VirtualCharacterStateMachine {
     this.loadVideoToBuffer(nextBuffer, targetStateID);
 
     // 等待下一个视频准备就绪
-    await this.waitForVideoReady(nextBuffer, 3000);
+    await this.waitForVideoReady(nextBuffer, 5000);
+
+    // 检查视频是否真的准备好了
+    if (nextBuffer.element.error) {
+      console.error('[StateMachine] Video has error, cannot transition to', targetStateID);
+      
+      // 如果目标状态是IDLE_CENTER，说明已经在尝试回退了，不要再回退
+      if (targetStateID === VideoStateID.IDLE_CENTER) {
+        console.error('[StateMachine] IDLE_CENTER video failed to load, cannot recover');
+        return;
+      }
+      
+      // 如果当前buffer还在正常播放，就保持当前状态
+      if (currentBuffer.element && !currentBuffer.element.error && !currentBuffer.element.paused) {
+        console.warn('[StateMachine] Staying in current state due to video load failure');
+        return;
+      }
+      
+      // 尝试回退到idle状态
+      console.warn('[StateMachine] Attempting to recover by transitioning to IDLE_CENTER');
+      // 使用 setTimeout 避免递归调用堆栈过深
+      setTimeout(() => {
+        this.transitionTo(VideoStateID.IDLE_CENTER, true);
+      }, 100);
+      return;
+    }
 
     // 检查是否被新的打断取消
     if (this.interruptFlag && !isInterrupt) {
@@ -471,8 +537,22 @@ export class VirtualCharacterStateMachine {
     // 播放新视频
     try {
       await nextBuffer.element.play();
+      console.log(`[StateMachine] Successfully playing ${targetStateID}`);
     } catch (e) {
       console.warn('[StateMachine] Auto-play blocked, waiting for user interaction');
+      // 当自动播放被阻止时，添加一次性点击监听器来恢复播放
+      const resumePlayback = async () => {
+        try {
+          await nextBuffer.element.play();
+          console.log('[StateMachine] Playback resumed after user interaction');
+          document.removeEventListener('click', resumePlayback);
+          document.removeEventListener('touchstart', resumePlayback);
+        } catch (err) {
+          console.error('[StateMachine] Failed to resume playback:', err);
+        }
+      };
+      document.addEventListener('click', resumePlayback, { once: true });
+      document.addEventListener('touchstart', resumePlayback, { once: true });
     }
 
     // 预加载下一个可能的状态
@@ -491,22 +571,76 @@ export class VirtualCharacterStateMachine {
    * 等待视频准备就绪
    */
   private waitForVideoReady(buffer: VideoBuffer, timeout: number): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      // 如果已经准备好，立即返回
       if (buffer.isReady || buffer.element.readyState >= 3) {
+        buffer.isReady = true;
         resolve();
         return;
       }
 
+      let resolved = false;
+      
+      // 监听 canplay 事件
+      const onCanPlay = () => {
+        if (!resolved) {
+          resolved = true;
+          buffer.isReady = true;
+          console.log(`[StateMachine] Video ready for ${buffer.currentState}`);
+          cleanup();
+          resolve();
+        }
+      };
+
+      // 监听错误事件
+      const onError = (e: Event) => {
+        if (!resolved) {
+          resolved = true;
+          console.error(`[StateMachine] Video load error for ${buffer.currentState}:`, e);
+          cleanup();
+          // 即使出错也resolve，让上层决定如何处理
+          resolve();
+        }
+      };
+
+      const cleanup = () => {
+        buffer.element.removeEventListener('canplay', onCanPlay);
+        buffer.element.removeEventListener('error', onError);
+      };
+
+      buffer.element.addEventListener('canplay', onCanPlay, { once: true });
+      buffer.element.addEventListener('error', onError, { once: true });
+
+      // 超时保护 - 增加超时时间到5秒
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          console.warn(`[StateMachine] Video ready timeout for ${buffer.currentState}, readyState=${buffer.element.readyState}`);
+          cleanup();
+          // 即使超时也标记为ready，尝试播放
+          buffer.isReady = buffer.element.readyState >= 2; // 至少有当前帧数据
+          resolve();
+        }
+      }, timeout);
+
+      // 轮询检查（作为备用）
       const checkReady = () => {
-        if (buffer.isReady || buffer.element.readyState >= 3) {
+        if (resolved) return;
+        
+        if (buffer.element.readyState >= 3) {
+          resolved = true;
+          buffer.isReady = true;
+          console.log(`[StateMachine] Video ready (polled) for ${buffer.currentState}`);
+          cleanup();
           resolve();
           return;
         }
-        requestAnimationFrame(checkReady);
+        
+        if (!resolved) {
+          requestAnimationFrame(checkReady);
+        }
       };
-
-      // 超时保护
-      setTimeout(resolve, timeout);
+      
       checkReady();
     });
   }
@@ -552,9 +686,23 @@ export class VirtualCharacterStateMachine {
     const currentState = this.config.states.get(this.currentStateID);
     if (!currentState) return;
 
+    console.log(`[StateMachine] Video ended: ${this.currentStateID}, isLoop: ${currentState.isLoop}, nextStateID: ${currentState.nextStateID}`);
+
     // 如果有自动跳转目标，执行跳转
     if (!currentState.isLoop && currentState.nextStateID) {
+      console.log(`[StateMachine] Auto-jumping to nextStateID: ${currentState.nextStateID}`);
       this.transitionTo(currentState.nextStateID, false);
+      return;
+    }
+
+    // 特殊处理：如果当前是待机动画且没有 nextStateID，播放完后随机选择下一个待机动画
+    const idleAnimationPattern = /^(IDLE_CENTER|ACTION_(IDLE_|LISTENING_V2|OBSERVING))/;
+    if (idleAnimationPattern.test(this.currentStateID) && !currentState.isLoop && !currentState.nextStateID) {
+      const nextIdleAnimation = this.getRandomIdleAnimation();
+      console.log('[StateMachine] Idle animation ended, playing next random idle:', nextIdleAnimation);
+      this.playAction(nextIdleAnimation);
+    } else {
+      console.log(`[StateMachine] No action taken for ended video: ${this.currentStateID}`);
     }
   }
 
@@ -563,6 +711,21 @@ export class VirtualCharacterStateMachine {
    */
   private isIdleState(stateID: VideoStateID): boolean {
     return stateID.startsWith('IDLE_');
+  }
+  
+  /**
+   * 获取随机待机动画
+   */
+  private getRandomIdleAnimation(): string {
+    const idleAnimations = [
+      'idle_1',
+      'idle_3', 
+      'idle_4',
+      'idle_alt',
+      'listening_v2',
+      'observing',
+    ];
+    return idleAnimations[Math.floor(Math.random() * idleAnimations.length)];
   }
 
   // ==================== 公共 API ====================
@@ -651,6 +814,7 @@ export class VirtualCharacterStateMachine {
       'idle_alt': VideoStateID.ACTION_IDLE_ALT,
       'idle_1': VideoStateID.ACTION_IDLE_1,
       'idle_3': VideoStateID.ACTION_IDLE_3,
+      'idle_4': VideoStateID.ACTION_IDLE_4,
       
       // 情绪 - 正面
       'happy': VideoStateID.ACTION_HAPPY,
@@ -669,6 +833,7 @@ export class VirtualCharacterStateMachine {
       
       // 活动状态
       'sleeping': VideoStateID.ACTION_SLEEPING,
+      'sleeping_long': VideoStateID.ACTION_SLEEPING_LONG,
       'listening': VideoStateID.ACTION_LISTENING_MUSIC,
       'listening_music': VideoStateID.ACTION_LISTENING_MUSIC,
       'listening_v2': VideoStateID.ACTION_LISTENING_V2,
@@ -676,6 +841,29 @@ export class VirtualCharacterStateMachine {
       'phone': VideoStateID.ACTION_PHONE,
       'check_phone': VideoStateID.ACTION_CHECK_PHONE,
       'notes': VideoStateID.ACTION_NOTES,
+      
+      // 天气相关
+      'weather': VideoStateID.ACTION_WEATHER,
+      
+      // 技能相关
+      'skill': VideoStateID.ACTION_SKILL,
+      
+      // 风相关
+      'wind_blowing': VideoStateID.ACTION_WIND_BLOWING,
+      'strong_wind': VideoStateID.ACTION_STRONG_WIND,
+      'wind_blowing_2': VideoStateID.ACTION_WIND_BLOWING_2,
+      
+      // 跳舞相关
+      'dancing': VideoStateID.ACTION_DANCING,
+      'dancing_2': VideoStateID.ACTION_DANCING_2,
+      
+      // 塔罗相关
+      'tarot_reading': VideoStateID.ACTION_TAROT_READING,
+      
+      // 其他动作
+      'surprised_observe': VideoStateID.ACTION_SURPRISED_OBSERVE,
+      'drinking_water': VideoStateID.ACTION_DRINKING_WATER,
+      'observing': VideoStateID.ACTION_OBSERVING,
     };
 
     const actionStateID = actionMap[actionName];

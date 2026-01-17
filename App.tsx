@@ -169,6 +169,7 @@ const App: React.FC = () => {
   const inputRef = useRef<HTMLInputElement>(null);
   const weatherFetchedRef = useRef<boolean>(false);
   const videoAvatarRef = useRef<VideoAvatarRef>(null);
+  const videoErrorCountRef = useRef<number>(0);
 
   // --- 检查认证状态 ---
   useEffect(() => {
@@ -582,6 +583,63 @@ const App: React.FC = () => {
     window.addEventListener('resize', checkScreenSize);
     
     return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+
+  // --- 视频错误恢复机制 ---
+  useEffect(() => {
+    const errorTimestamps = new Map<HTMLVideoElement, number[]>();
+    
+    const handleVideoError = (event: Event) => {
+      const target = event.target as HTMLVideoElement;
+      if (target && target.tagName === 'VIDEO') {
+        const now = Date.now();
+        
+        // 获取此视频元素的错误时间戳列表
+        if (!errorTimestamps.has(target)) {
+          errorTimestamps.set(target, []);
+        }
+        const timestamps = errorTimestamps.get(target)!;
+        
+        // 清理10秒前的错误记录
+        const recentTimestamps = timestamps.filter(t => now - t < 10000);
+        recentTimestamps.push(now);
+        errorTimestamps.set(target, recentTimestamps);
+        
+        videoErrorCountRef.current += 1;
+        console.error('[App] Video error detected, count:', videoErrorCountRef.current, 'recent errors:', recentTimestamps.length);
+        
+        // 如果10秒内错误次数超过3次，说明是同一个视频反复失败，停止重试
+        if (recentTimestamps.length > 3) {
+          console.error('[App] Same video failed multiple times, stopping retry');
+          return;
+        }
+        
+        // 如果总错误次数不超过3次，尝试重新加载
+        if (videoErrorCountRef.current <= 3) {
+          console.warn('[App] Attempting to recover from video error...');
+          // 不要重新加载，让状态机处理回退
+        } else {
+          console.error('[App] Too many video errors, please refresh the page');
+        }
+      }
+    };
+
+    // 重置错误计数器（每分钟）
+    const resetErrorCount = setInterval(() => {
+      if (videoErrorCountRef.current > 0) {
+        console.log('[App] Resetting video error count');
+        videoErrorCountRef.current = 0;
+        errorTimestamps.clear();
+      }
+    }, 60000);
+
+    // 全局监听video错误（使用捕获阶段）
+    document.addEventListener('error', handleVideoError, true);
+
+    return () => {
+      document.removeEventListener('error', handleVideoError, true);
+      clearInterval(resetErrorCount);
+    };
   }, []);
 
   // --- 面板联动逻辑 ---
