@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { AssistantState, Message, TodoItem, WeatherData, UserProfile, TarotResult, WaterRecord, CalorieRecord, SleepRecord, ExerciseRecord } from './types';
-import Avatar from './components/Avatar';
+import VideoAvatar, { VideoAvatarRef } from './components/VideoAvatar';
 import ChatInterface from './components/ChatInterface';
 import Onboarding from './components/Onboarding';
 import WeatherPanel from './components/tools/WeatherPanel';
@@ -66,6 +66,7 @@ const App: React.FC = () => {
   const audioContextRef = useRef<AudioContext | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const weatherFetchedRef = useRef<boolean>(false); // 防止重复请求天气数据
+  const videoAvatarRef = useRef<VideoAvatarRef>(null); // 视频人物状态机引用
 
   // --- Helpers ---
   const addMessage = (role: 'user' | 'assistant', content: string) => {
@@ -218,6 +219,31 @@ const App: React.FC = () => {
       speak(intro);
   };
 
+  // --- 面板联动逻辑：根据面板状态控制视频人物朝向 ---
+  useEffect(() => {
+    if (!videoAvatarRef.current) return;
+
+    // 优先级：左面板 > 右面板 > 无面板（中间）
+    if (leftPanel !== 'none') {
+      videoAvatarRef.current.focusLeft();
+    } else if (rightPanel !== 'none') {
+      videoAvatarRef.current.focusRight();
+    } else {
+      videoAvatarRef.current.focusCenter();
+    }
+  }, [leftPanel, rightPanel]);
+
+  // --- 语音状态联动：说话时播放对应动作 ---
+  useEffect(() => {
+    if (!videoAvatarRef.current) return;
+
+    if (state === AssistantState.SPEAKING) {
+      videoAvatarRef.current.playAction('speaking');
+    } else if (state === AssistantState.THINKING) {
+      videoAvatarRef.current.playAction('thinking');
+    }
+  }, [state]);
+
   if (!userProfile) return <Onboarding onComplete={handleOnboardingComplete} />;
 
   return (
@@ -248,9 +274,17 @@ const App: React.FC = () => {
                 )}
              </div>
 
-             {/* Character */}
-             <div className="w-full max-w-lg h-[50vh] md:h-[60vh] flex items-center justify-center relative">
-                 <Avatar state={state} mode="full" className="h-full w-auto object-contain drop-shadow-2xl" />
+             {/* Character - 使用视频状态机驱动的人物 */}
+             <div className="w-full max-w-lg h-[50vh] md:h-[60vh] flex items-center justify-center relative pointer-events-auto">
+                 <VideoAvatar 
+                   ref={videoAvatarRef}
+                   className="h-full w-full"
+                   autoPlay={true}
+                   debug={false}
+                   onStateChange={(event) => {
+                     console.log('[App] Character state:', event.currentState);
+                   }}
+                 />
              </div>
         </div>
 
@@ -259,28 +293,22 @@ const App: React.FC = () => {
             {/* Icons Column - Styled like image */}
             <div className="flex flex-col gap-3">
                 <ToolbarIcon 
-                    icon={<CheckSquare size={22} />} 
+                    icon={<Activity size={22} />} 
                     active={leftPanel === 'info_health'} 
                     onClick={() => setLeftPanel(leftPanel === 'info_health' ? 'none' : 'info_health')}
-                    label="待办"
-                />
-                <ToolbarIcon 
-                    icon={<Calendar size={22} />} 
-                    active={leftPanel === 'info_weather'} 
-                    onClick={() => setLeftPanel(leftPanel === 'info_weather' ? 'none' : 'info_weather')}
-                    label="日程"
+                    label="健康"
                 />
                 <ToolbarIcon 
                     icon={<CloudSun size={22} />} 
-                    active={false} 
-                    onClick={() => {}}
+                    active={leftPanel === 'info_weather'} 
+                    onClick={() => setLeftPanel(leftPanel === 'info_weather' ? 'none' : 'info_weather')}
                     label="天气"
                 />
                 <ToolbarIcon 
-                    icon={<Zap size={22} />} 
+                    icon={<Sparkles size={22} />} 
                     active={leftPanel === 'info_fortune'} 
                     onClick={() => setLeftPanel(leftPanel === 'info_fortune' ? 'none' : 'info_fortune')}
-                    label="技能"
+                    label="占卜"
                 />
             </div>
 
@@ -312,32 +340,25 @@ const App: React.FC = () => {
             {/* Icons Column - Styled like image */}
             <div className="flex flex-col gap-3">
                 <ToolbarIcon 
-                    icon={<Notebook size={22} />} 
+                    icon={<CheckSquare size={22} />} 
                     active={rightPanel === 'prod_todo'} 
                     onClick={() => setRightPanel(rightPanel === 'prod_todo' ? 'none' : 'prod_todo')}
-                    label="笔记"
+                    label="待办"
                     notification={hasNewTodo}
                     position="right"
                 />
                 <ToolbarIcon 
-                    icon={<Image size={22} />} 
-                    active={false} 
-                    onClick={() => {}}
-                    label="相册"
-                    position="right"
-                />
-                <ToolbarIcon 
-                    icon={<Activity size={22} />} 
+                    icon={<Zap size={22} />} 
                     active={rightPanel === 'prod_skills'} 
                     onClick={() => setRightPanel(rightPanel === 'prod_skills' ? 'none' : 'prod_skills')}
-                    label="活动"
+                    label="技能"
                     position="right"
                 />
                 <ToolbarIcon 
-                    icon={<Settings size={22} />} 
+                    icon={<Mic2 size={22} />} 
                     active={rightPanel === 'prod_voice'} 
                     onClick={() => setRightPanel(rightPanel === 'prod_voice' ? 'none' : 'prod_voice')}
-                    label="设置"
+                    label="声音"
                     position="right"
                 />
             </div>
