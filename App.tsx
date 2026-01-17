@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { AssistantState, Message, TodoItem, TodoCategory, WeatherData, TarotResult, WaterRecord, CalorieRecord, SleepRecord, ExerciseRecord } from './types';
+import { AssistantState, Message, TodoItem, TodoCategory, WeatherData, TarotResult, WaterRecord, CalorieRecord, SleepRecord, ExerciseRecord, AffinityData, AffinityEvent } from './types';
 import VideoAvatar, { VideoAvatarRef } from './components/VideoAvatar';
 import ChatInterface from './components/ChatInterface';
 import AuthScreen from './components/AuthScreen';
@@ -12,13 +12,18 @@ import SkillsPanel from './components/tools/SkillsPanel';
 import AnimationPanel from './components/tools/AnimationPanel';
 // import VoicePanel from './components/tools/VoicePanel'; // 已移除音色选择功能
 import WatchaPanel from './components/tools/WatchaPanel';
+import AffinityIndicator from './components/AffinityIndicator';
+import AffinityToast from './components/AffinityToast';
+import AffinityDetailPanel from './components/AffinityDetailPanel';
+import FloatingAffinityHint from './components/FloatingAffinityHint';
 import { createEmotionalConfig } from './config/characterConfig';
 import { api, authApi, chatApi, categoryApi, healthApi, todoApi, weatherApi, ttsApi, emotionApi } from './services/api';
 import { decodeAudioData, playAudioBuffer } from './services/audioService';
+import { loadAffinityData, updateAffinity } from './services/affinityService';
 import { CloudSun, Sparkles, Mic2, Activity, CheckSquare, Zap, ChevronUp, ChevronDown, LogOut, Film } from 'lucide-react';
 
 // Panel Types - 统一管理，所有面板都在右侧显示
-type ActivePanelType = 'none' | 'weather' | 'fortune' | 'health' | 'todo' | 'skills' | 'watcha' | 'animation';
+type ActivePanelType = 'none' | 'weather' | 'fortune' | 'health' | 'todo' | 'skills' | 'watcha' | 'animation' | 'affinity';
 
 // 用户信息类型
 interface UserProfile {
@@ -72,6 +77,42 @@ const App: React.FC = () => {
 
   // Mock Data
   const [tarot, setTarot] = useState<TarotResult | undefined>(undefined);
+
+  // 好感度系统
+  const [affinity, setAffinity] = useState<AffinityData>(loadAffinityData());
+  const lastDailyChatRef = useRef<string>(''); // 记录上次每日首次对话的日期
+  const [affinityToast, setAffinityToast] = useState<AffinityEvent | null>(null); // 好感度变化提示
+  const [floatingHints, setFloatingHints] = useState<Array<{ id: string; event: AffinityEvent; side: 'left' | 'right'; offset: number }>>([]); // 浮动提示列表
+
+  // 显示好感度变化提示的辅助函数
+  const showAffinityChange = (event: AffinityEvent) => {
+    // 显示Toast提示
+    setAffinityToast(event);
+    
+    // 添加浮动提示（随机左右侧和位置）
+    const side = Math.random() > 0.5 ? 'left' : 'right';
+    const offset = Math.random() * 30; // 0-30%的随机偏移
+    const id = `hint-${Date.now()}-${Math.random()}`;
+    
+    setFloatingHints(prev => [...prev, { id, event, side, offset }]);
+    
+    // 3.5秒后自动移除（动画3秒 + 0.5秒缓冲）
+    setTimeout(() => {
+      setFloatingHints(prev => prev.filter(h => h.id !== id));
+    }, 3500);
+  };
+
+  const applyAffinityChange = (actionType: Parameters<typeof updateAffinity>[0]) => {
+    const { data: newAffinity, emotion } = updateAffinity(actionType);
+    setAffinity(newAffinity);
+    if (newAffinity.history.length > 0) {
+      const lastEvent = newAffinity.history[newAffinity.history.length - 1];
+      showAffinityChange(lastEvent);
+    }
+    if (emotion && videoAvatarRef.current) {
+      videoAvatarRef.current.playAction(emotion);
+    }
+  };
 
   // --- Refs ---
   const recognitionRef = useRef<any>(null);
@@ -190,6 +231,12 @@ const App: React.FC = () => {
     // 重置活动计时器（用户有交互）
     videoAvatarRef.current?.playAction('listening_v2');
 
+    const today = new Date().toDateString();
+    if (lastDailyChatRef.current !== today) {
+      lastDailyChatRef.current = today;
+      applyAffinityChange('daily_chat');
+    }
+
     try {
       // 并行请求：发送消息 + 检测情绪
       const [chatResult, emotionResult] = await Promise.all([
@@ -209,10 +256,12 @@ const App: React.FC = () => {
             case 'setWeather':
               setWeather(action.data);
               setActivePanel('weather');
+              applyAffinityChange('weather_check');
               break;
             case 'setTarot':
               setTarot(action.data);
               setActivePanel('fortune');
+              applyAffinityChange('fortune_draw');
               break;
             case 'updateHealth':
               if (action.data.water) {
@@ -220,7 +269,10 @@ const App: React.FC = () => {
                   ...prev,
                   water: { ...prev.water, current: action.data.water.current }
                 }));
+                applyAffinityChange('health_water');
               }
+              break;
+            default:
               break;
           }
         }
@@ -277,6 +329,7 @@ const App: React.FC = () => {
           ...prev,
         water: { ...prev.water, current: result.data.current }
       }));
+      applyAffinityChange('health_water');
       speak("咕嘟咕嘟，补充水分啦！");
       setState(AssistantState.SPEAKING);
     }
@@ -345,8 +398,9 @@ const App: React.FC = () => {
     else recognitionRef.current?.start();
   }, [isListening]);
 
-   // 缓存视频人物配置
-   const characterConfig = useMemo(() => createEmotionalConfig(), []);
+  // 缓存视频人物配置（避免每次渲染都重新创建）
+  // 使用带有情绪动作的配置，支持好感度系统
+  const characterConfig = useMemo(() => createEmotionalConfig(), []);
 
   // --- 监听屏幕大小变化 ---
   useEffect(() => {
@@ -467,7 +521,16 @@ const App: React.FC = () => {
                 )}
              </div>
 
-            {/* Character */}
+            {/* 好感度指示器 - 在角色上方右侧 */}
+            <div 
+              className="absolute top-4 md:top-6 right-4 md:right-6 z-20 pointer-events-auto cursor-pointer hover:scale-105 transition-transform"
+              onClick={() => setActivePanel(activePanel === 'affinity' ? 'none' : 'affinity')}
+              title="点击查看好感度详情"
+            >
+              <AffinityIndicator affinity={affinity} compact={true} />
+            </div>
+
+            {/* Character - 视频状态机驱动的人物 - 响应式缩放 */}
             <div 
               className={`
                 w-full flex items-center justify-center relative pointer-events-auto 
@@ -544,10 +607,15 @@ const App: React.FC = () => {
                       categories={categories}
                       todos={todos} 
                       onToggle={async (id) => {
+                        const previousTodo = todos.find(todo => todo.id === id);
                         await todoApi.toggle(id);
                         const result = await todoApi.getList(true);
                         if (result.success && result.data) {
                           setTodos(result.data);
+                          const updatedTodo = result.data.find(todo => todo.id === id);
+                          if (previousTodo && updatedTodo && !previousTodo.completed && updatedTodo.completed) {
+                            applyAffinityChange('todo_complete');
+                          }
                         }
                       }}
                       onAddTodo={async (todo) => {
@@ -557,6 +625,7 @@ const App: React.FC = () => {
                           if (listResult.success && listResult.data) {
                             setTodos(listResult.data);
                           }
+                          applyAffinityChange('todo_add');
                         }
                       }}
                       onDelete={async (id) => {
@@ -577,12 +646,39 @@ const App: React.FC = () => {
                       }}
                     />
                   )}
+                  {activePanel === 'affinity' && (
+                    <AffinityDetailPanel 
+                      affinity={affinity}
+                      onClose={() => setActivePanel('none')}
+                    />
+                  )}
                 </div>
               </div>
             )}
           </div>
         </div>
-      </div>
+
+        {/* 好感度变化提示 Toast */}
+        {affinityToast && (
+          <AffinityToast
+            event={affinityToast}
+            onClose={() => setAffinityToast(null)}
+          />
+        )}
+
+        {/* 浮动好感度提示 - 在角色左右两侧 */}
+        {floatingHints.map((hint) => (
+          <FloatingAffinityHint
+            key={hint.id}
+            event={hint.event}
+            side={hint.side}
+            offset={hint.offset}
+            onComplete={() => {
+              setFloatingHints(prev => prev.filter(h => h.id !== hint.id));
+            }}
+          />
+        ))}
+    </div>
   );
 };
 

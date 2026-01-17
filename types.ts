@@ -125,3 +125,37 @@ export interface Voice {
   language?: string;
   tags?: string[];
 }
+
+// ==================== 好感度系统 ====================
+
+// 好感度数据
+export interface AffinityData {
+  value: number; // 0-1000（总分）
+  level: AffinityLevel; // v1-v10等级
+  lastInteraction: number; // 最后交互时间戳
+  totalInteractions: number; // 总交互次数
+  history: AffinityEvent[]; // 好感度变化历史（可滚动查看）
+}
+
+export interface AffinityEvent {
+  timestamp: number;
+  change: number; // 变化值（正数增加，负数减少）
+  reason: string; // 变化原因
+  action: string; // 触发动作类型
+}
+
+// 好感度等级：v1-v10
+export type AffinityLevel = 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'v8' | 'v9' | 'v10';
+
+// 好感度触发动作类型
+export type AffinityActionType = 
+  | 'todo_complete'      // 完成待办
+  | 'todo_add'           // 添加待办
+  | 'health_water'       // 记录喝水
+  | 'health_goal'        // 完成健康目标
+  | 'weather_check'      // 查询天气
+  | 'fortune_draw'       // 占卜
+  | 'daily_chat'         // 每日首次对话
+  | 'positive_reply'     // 积极回复
+  | 'negative_reply'     // 负面回复
+  | 'no_interaction';    // 长时间不互动
