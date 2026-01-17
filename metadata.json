@@ -1,0 +1,8 @@
+{
+  "name": "Kizuna AI - Virtual Assistant MVP",
+  "description": "A personalized virtual companion with voice interaction, daily utilities (weather, todos), and custom skills.",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation"
+  ]
+}
