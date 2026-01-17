@@ -16,7 +16,7 @@ import { generateSpeech } from './services/minimaxService';
 import { decodeAudioData, playAudioBuffer } from './services/audioService';
 import { getWeatherByLocation, getWeatherByIP } from './services/weatherService';
 import { createCustomConfig } from './config/characterConfig';
-import { CloudSun, Sparkles, Notebook, Zap, Settings, X, Bell, Clock, Mic2, Activity, CheckSquare, Calendar, Image, Phone, Globe } from 'lucide-react';
+import { CloudSun, Sparkles, Notebook, Zap, Settings, X, Bell, Clock, Mic2, Activity, CheckSquare, Calendar, Image, Phone, Globe, ChevronUp, ChevronDown } from 'lucide-react';
 
 // 塔罗牌数据库
 const TAROT_CARDS = [
@@ -44,23 +44,24 @@ const TAROT_CARDS = [
   { name: '世界', upright: '完成、整合、成就', reversed: '不完整、缺乏closure' },
 ];
 
-// Panel Types
-type LeftPanelType = 'none' | 'info_weather' | 'info_fortune' | 'info_health';
-type RightPanelType = 'none' | 'prod_todo' | 'prod_skills' | 'prod_voice' | 'prod_watcha';
+// Panel Types - 统一管理，所有面板都在右侧显示
+type ActivePanelType = 'none' | 'weather' | 'fortune' | 'health' | 'todo' | 'skills' | 'voice' | 'watcha';
 
 const App: React.FC = () => {
   // --- State ---
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   
-  // Panel States
-  const [leftPanel, setLeftPanel] = useState<LeftPanelType>('none');
-  const [rightPanel, setRightPanel] = useState<RightPanelType>('none');
+  // Panel States - 统一管理
+  const [activePanel, setActivePanel] = useState<ActivePanelType>('none');
   
   // Voice State
   const [currentVoiceId, setCurrentVoiceId] = useState<string>('female-shaonv');
   
   // Micro-interaction State
   const [hasNewTodo, setHasNewTodo] = useState(false);
+  
+  // 响应式屏幕大小检测
+  const [isSmallScreen, setIsSmallScreen] = useState(false);
 
   const [state, setState] = useState<AssistantState>(AssistantState.IDLE);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -189,7 +190,7 @@ ${drawnCards[2].name}指向未来的可能，预示${drawnCards[2].meaning}。`;
             category: category as 'health' | 'work' | 'dev' | 'content' | undefined
           }];
         });
-        setRightPanel('prod_todo');
+        setActivePanel('todo');
       },
       
       onToggleTodo: (searchText: string): boolean => {
@@ -201,7 +202,7 @@ ${drawnCards[2].name}指向未来的可能，预示${drawnCards[2].meaning}。`;
           }
           return t;
         }));
-        if (found) setRightPanel('prod_todo');
+        if (found) setActivePanel('todo');
         return found;
       },
       
@@ -223,7 +224,7 @@ ${drawnCards[2].name}指向未来的可能，预示${drawnCards[2].meaning}。`;
       // --- 天气 ---
       onSetWeather: (data: WeatherData) => {
         setWeather(data);
-        setLeftPanel('info_weather');
+        setActivePanel('weather');
       },
 
       // --- 健康追踪 ---
@@ -241,7 +242,7 @@ ${drawnCards[2].name}指向未来的可能，预示${drawnCards[2].meaning}。`;
             }]
           }
         }));
-        setLeftPanel('info_health');
+        setActivePanel('health');
       },
       
       onGetHealthStatus: (): HealthData => {
@@ -252,35 +253,13 @@ ${drawnCards[2].name}指向未来的可能，预示${drawnCards[2].meaning}。`;
       onDrawTarot: (question?: string): TarotResult => {
         const result = generateTarotReading(question || '今日运势');
         setTarot(result);
-        setLeftPanel('info_fortune');
+        setActivePanel('fortune');
         return result;
       },
 
       // --- 面板控制 ---
       onOpenPanel: (panel: string) => {
-        switch (panel) {
-          case 'weather':
-            setLeftPanel('info_weather');
-            break;
-          case 'health':
-            setLeftPanel('info_health');
-            break;
-          case 'fortune':
-            setLeftPanel('info_fortune');
-            break;
-          case 'todo':
-            setRightPanel('prod_todo');
-            break;
-          case 'skills':
-            setRightPanel('prod_skills');
-            break;
-          case 'voice':
-            setRightPanel('prod_voice');
-            break;
-          case 'watcha':
-            setRightPanel('prod_watcha');
-            break;
-        }
+        setActivePanel(panel as ActivePanelType);
       }
     };
 
@@ -383,19 +362,29 @@ ${drawnCards[2].name}指向未来的可能，预示${drawnCards[2].meaning}。`;
   // 缓存视频人物配置（避免每次渲染都重新创建）
   const characterConfig = useMemo(() => createCustomConfig(), []);
 
+  // --- 监听屏幕大小变化 ---
+  useEffect(() => {
+    const checkScreenSize = () => {
+      setIsSmallScreen(window.innerWidth < 768);
+    };
+    
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    
+    return () => window.removeEventListener('resize', checkScreenSize);
+  }, []);
+
   // --- 面板联动逻辑：根据面板状态控制视频人物朝向 ---
   useEffect(() => {
     if (!videoAvatarRef.current) return;
 
-    // 优先级：左面板 > 右面板 > 无面板（中间）
-    if (leftPanel !== 'none') {
-      videoAvatarRef.current.focusLeft();
-    } else if (rightPanel !== 'none') {
+    // 激活面板时朝右看，否则朝中间
+    if (activePanel !== 'none') {
       videoAvatarRef.current.focusRight();
     } else {
       videoAvatarRef.current.focusCenter();
     }
-  }, [leftPanel, rightPanel]);
+  }, [activePanel]);
 
   // --- 语音状态联动：说话时播放对应动作 ---
   useEffect(() => {
@@ -409,6 +398,9 @@ ${drawnCards[2].name}指向未来的可能，预示${drawnCards[2].meaning}。`;
   }, [state]);
 
   if (!userProfile) return <Onboarding onComplete={handleOnboardingComplete} />;
+
+  // 判断是否有面板打开
+  const hasPanelOpen = activePanel !== 'none';
 
   return (
     <div className="fixed inset-0 bg-[#fdfcf8] text-[#5c4d43] font-sans overflow-hidden selection:bg-[#e6dec8]">
@@ -425,199 +417,309 @@ ${drawnCards[2].name}指向未来的可能，预示${drawnCards[2].meaning}。`;
         {/* Subtle overlay for readability */}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#fdfcf8]/30 pointer-events-none"></div>
 
-        {/* --- Center Stage (40-50% width) --- */}
-        <div className="absolute inset-x-0 top-0 bottom-32 flex flex-col items-center justify-center z-10 pointer-events-none">
-             
-             {/* Speech Bubble Area */}
-             <div className="w-full max-w-md h-32 flex items-end justify-center mb-4 px-6">
-                {state === AssistantState.SPEAKING && latestResponse && (
-                    <div className="bg-white/90 backdrop-blur-md border border-purple-100 px-6 py-4 rounded-3xl rounded-bl-none shadow-xl text-sm md:text-base font-medium text-gray-700 animate-fade-in-up relative max-w-full text-center">
-                        {latestResponse}
-                        <div className="absolute -bottom-2 left-6 w-4 h-4 bg-white/90 border-b border-r border-purple-100 transform rotate-45"></div>
-                    </div>
-                )}
-             </div>
+        {/* === 主布局容器 - 使用 Flex 铺满整个屏幕 === */}
+        <div className="relative h-full w-full flex">
+          
+          {/* --- 左侧工具栏区域 (固定宽度) --- */}
+          <div className="flex-shrink-0 flex items-center justify-center z-30 w-16 sm:w-20 md:w-24 transition-all duration-500">
+            <ScrollableToolbar 
+              activePanel={activePanel} 
+              setActivePanel={setActivePanel} 
+              hasNewTodo={hasNewTodo} 
+              videoAvatarRef={videoAvatarRef} 
+            />
+          </div>
 
-              {/* Character - 使用视频状态机驱动的人物 */}
-              <div className="w-full max-w-lg h-[50vh] md:h-[60vh] flex items-center justify-center relative pointer-events-auto">
-                  <VideoAvatar 
-                    ref={videoAvatarRef}
-                    config={characterConfig}
-                    className="h-full w-full"
-                    autoPlay={true}
-                    debug={true}
-                    onStateChange={(event) => {
-                      console.log('[App] Character state:', event.currentState, 'previous:', event.previousState);
-                    }}
-                  />
-              </div>
-        </div>
-
-        {/* --- Left Panel (Information Board) --- */}
-        <div className="absolute left-6 top-1/2 -translate-y-1/2 z-30 flex flex-row items-center gap-4">
-            {/* Icons Column - Styled like image */}
-            <div className="flex flex-col gap-3">
-                <ToolbarIcon 
-                    icon={<Activity size={22} />} 
-                    active={leftPanel === 'info_health'} 
-                    onClick={() => setLeftPanel(leftPanel === 'info_health' ? 'none' : 'info_health')}
-                    label="健康"
-                />
-                <ToolbarIcon 
-                    icon={<CloudSun size={22} />} 
-                    active={leftPanel === 'info_weather'} 
-                    onClick={() => setLeftPanel(leftPanel === 'info_weather' ? 'none' : 'info_weather')}
-                    label="天气"
-                />
-                <ToolbarIcon 
-                    icon={<Sparkles size={22} />} 
-                    active={leftPanel === 'info_fortune'} 
-                    onClick={() => setLeftPanel(leftPanel === 'info_fortune' ? 'none' : 'info_fortune')}
-                    label="占卜"
-                />
+          {/* --- 中间区域：叉叉 + 对话框 --- */}
+          <div className={`
+            flex flex-col items-center justify-center relative z-10
+            transition-all duration-500 ease-out
+            ${hasPanelOpen ? 'flex-[0.55] min-w-0' : 'flex-1'}
+          `}>
+            {/* Speech Bubble Area */}
+            <div className="w-full max-w-sm md:max-w-md lg:max-w-lg h-20 md:h-28 flex items-end justify-center mb-2 px-4 pointer-events-none">
+              {state === AssistantState.SPEAKING && latestResponse && (
+                <div className="bg-white/90 backdrop-blur-md border border-purple-100 px-4 md:px-6 py-3 md:py-4 rounded-2xl md:rounded-3xl rounded-bl-none shadow-xl text-xs sm:text-sm md:text-base font-medium text-gray-700 animate-fade-in-up relative max-w-full text-center">
+                  {latestResponse}
+                  <div className="absolute -bottom-2 left-4 md:left-6 w-3 md:w-4 h-3 md:h-4 bg-white/90 border-b border-r border-purple-100 transform rotate-45"></div>
+                </div>
+              )}
             </div>
 
-            {/* Slide-out Content Card */}
-            {leftPanel !== 'none' && (
-                <div className="w-[26rem] h-[600px] animate-slide-in-left">
-                    <div className="h-full rounded-[2.5rem] shadow-2xl overflow-hidden glass-panel-strong border border-white/50">
-                        {leftPanel === 'info_weather' && (
-                             weather ? <WeatherPanel weather={weather} /> 
-                             : <div className="p-8 text-center text-gray-500 flex flex-col items-center justify-center h-full gap-2">
-                                 <Clock className="animate-spin text-gray-300"/>
-                                 <span>正在校准时间线...</span>
-                               </div>
-                        )}
-                        {leftPanel === 'info_health' && (
-                            <HealthPanel 
-                                {...healthData}
-                                onAddWater={handleAddWater}
-                            />
-                        )}
-                        {leftPanel === 'info_fortune' && <DivinationPanel result={tarot} />}
-                    </div>
-                </div>
-            )}
-        </div>
-
-        {/* --- Right Panel (Productivity Center) --- */}
-        <div className="absolute right-6 top-1/2 -translate-y-1/2 z-30 flex flex-row-reverse items-center gap-4">
-            {/* Icons Column - Styled like image */}
-            <div className="flex flex-col gap-3">
-                <ToolbarIcon 
-                    icon={<CheckSquare size={22} />} 
-                    active={rightPanel === 'prod_todo'} 
-                    onClick={() => {
-                        const newState = rightPanel === 'prod_todo' ? 'none' : 'prod_todo';
-                        console.log('[App] 待办按钮点击 - 新状态:', newState);
-                        setRightPanel(newState);
-                        // 打开待办面板时播放动作
-                        if (newState === 'prod_todo') {
-                            console.log('[App] 尝试播放 wave 动作, videoAvatarRef:', videoAvatarRef.current);
-                            if (videoAvatarRef.current) {
-                                videoAvatarRef.current.playAction('wave');
-                                console.log('[App] playAction("wave") 已调用');
-                            } else {
-                                console.error('[App] videoAvatarRef.current 为 null!');
-                            }
-                        }
-                    }}
-                    label="待办"
-                    notification={hasNewTodo}
-                    position="right"
-                />
-                <ToolbarIcon 
-                    icon={<Zap size={22} />} 
-                    active={rightPanel === 'prod_skills'} 
-                    onClick={() => setRightPanel(rightPanel === 'prod_skills' ? 'none' : 'prod_skills')}
-                    label="技能"
-                    position="right"
-                />
-                <ToolbarIcon 
-                    icon={<Mic2 size={22} />} 
-                    active={rightPanel === 'prod_voice'} 
-                    onClick={() => setRightPanel(rightPanel === 'prod_voice' ? 'none' : 'prod_voice')}
-                    label="声音"
-                    position="right"
-                />
-                <ToolbarIcon 
-                    icon={
-                        <img 
-                            src="/watcha.svg" 
-                            alt="Watcha" 
-                            className="w-5 h-5"
-                            style={{ filter: rightPanel === 'prod_watcha' ? 'none' : 'opacity(0.6)' }}
-                        />
-                    } 
-                    active={rightPanel === 'prod_watcha'} 
-                    onClick={() => setRightPanel(rightPanel === 'prod_watcha' ? 'none' : 'prod_watcha')}
-                    label="Watcha"
-                    position="right"
-                />
+            {/* Character - 视频状态机驱动的人物 - 响应式缩放 */}
+            <div 
+              className={`
+                w-full flex items-center justify-center relative pointer-events-auto 
+                transition-all duration-500 ease-out
+                h-[40vh] sm:h-[45vh] md:h-[55vh] lg:h-[60vh]
+                mt-16 sm:mt-18 md:mt-20 lg:mt-24
+                ${hasPanelOpen ? 'max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg' : 'max-w-sm md:max-w-md lg:max-w-lg'}
+              `}
+              style={{
+                // 小设备放大 25%，大设备放大 15%
+                transform: hasPanelOpen 
+                  ? (isSmallScreen ? 'scale(1.375)' : 'scale(1.265)') 
+                  : (isSmallScreen ? 'scale(1.25)' : 'scale(1.15)'),
+                transformOrigin: 'center bottom'
+              }}
+            >
+              <VideoAvatar 
+                ref={videoAvatarRef}
+                config={characterConfig}
+                className="h-full w-full"
+                autoPlay={true}
+                debug={true}
+                onStateChange={(event) => {
+                  console.log('[App] Character state:', event.currentState, 'previous:', event.previousState);
+                }}
+              />
             </div>
 
-            {/* Slide-out Content Card */}
-            {rightPanel !== 'none' && (
-                <div className="w-[26rem] h-[600px] animate-slide-in-right">
-                    <div className="h-full rounded-[2.5rem] shadow-2xl overflow-hidden glass-panel-strong border border-white/50">
-                        {rightPanel === 'prod_todo' && (
-                            <TodoPanel 
-                                todos={todos} 
-                                onToggle={(id) => setTodos(prev => prev.map(t => t.id === id ? {...t, completed: !t.completed} : t))} 
-                            />
-                        )}
-                        {rightPanel === 'prod_skills' && <SkillsPanel />}
-                        {rightPanel === 'prod_voice' && (
-                            <VoicePanel 
-                                currentVoiceId={currentVoiceId}
-                                onVoiceSelected={handleVoiceSelected} 
-                            />
-                        )}
-                        {rightPanel === 'prod_watcha' && <WatchaPanel />}
-                    </div>
-                </div>
-            )}
-        </div>
-
-        {/* --- Bottom Control Bar --- */}
-        <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-full max-w-xl px-6 z-40">
-            <ChatInterface 
+            {/* Bottom Chat Interface - 让它占用尽可能多的可用宽度 */}
+            <div className={`
+              w-full mt-auto px-3 md:px-4 pb-4 md:pb-6
+              ${hasPanelOpen ? 'max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl' : 'max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl'}
+            `}>
+              <ChatInterface 
                 messages={messages}
                 isListening={isListening}
                 onSendMessage={processInput}
                 onToggleListening={toggleListening}
                 inputRef={inputRef}
-            />
+              />
+            </div>
+          </div>
+
+          {/* --- 右侧面板区域 (动态宽度，铺满剩余空间) --- */}
+          <div className={`
+            flex items-center justify-start z-30 pr-3 sm:pr-4 md:pr-6
+            transition-all duration-500 ease-out overflow-hidden
+            ${hasPanelOpen 
+              ? 'flex-[0.45] min-w-0 opacity-100' 
+              : 'w-0 flex-none opacity-0 pointer-events-none'
+            }
+          `}>
+            {hasPanelOpen && (
+              <div className="w-full h-[88vh] max-h-[750px] animate-slide-in-right">
+                <div className="h-full rounded-2xl sm:rounded-3xl lg:rounded-[2rem] overflow-hidden glass-panel-strong border border-white/50">
+                  {activePanel === 'weather' && (
+                    weather ? <WeatherPanel weather={weather} /> 
+                    : <div className="p-8 text-center text-gray-500 flex flex-col items-center justify-center h-full gap-2">
+                        <Clock className="animate-spin text-gray-300"/>
+                        <span>正在校准时间线...</span>
+                      </div>
+                  )}
+                  {activePanel === 'health' && (
+                    <HealthPanel 
+                      {...healthData}
+                      onAddWater={handleAddWater}
+                    />
+                  )}
+                  {activePanel === 'fortune' && <DivinationPanel result={tarot} />}
+                  {activePanel === 'todo' && (
+                    <TodoPanel 
+                      todos={todos} 
+                      onToggle={(id) => setTodos(prev => prev.map(t => t.id === id ? {...t, completed: !t.completed} : t))} 
+                    />
+                  )}
+                  {activePanel === 'skills' && <SkillsPanel />}
+                  {activePanel === 'voice' && (
+                    <VoicePanel 
+                      currentVoiceId={currentVoiceId}
+                      onVoiceSelected={handleVoiceSelected} 
+                    />
+                  )}
+                  {activePanel === 'watcha' && <WatchaPanel />}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-        
-        {/* Global styles now loaded from /styles/main.css */}
     </div>
   );
 };
 
-// Helper Component for Toolbar Icons (styled like the reference image)
-const ToolbarIcon = ({ icon, active, onClick, label, notification, position = 'left' }: { 
+// Scrollable Toolbar Component with fade indicators
+const ScrollableToolbar = ({ 
+  activePanel, 
+  setActivePanel, 
+  hasNewTodo,
+  videoAvatarRef 
+}: { 
+  activePanel: ActivePanelType;
+  setActivePanel: (panel: ActivePanelType) => void;
+  hasNewTodo: boolean;
+  videoAvatarRef: React.RefObject<VideoAvatarRef | null>;
+}) => {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const toolRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const [showTopFade, setShowTopFade] = useState(false);
+  const [showBottomFade, setShowBottomFade] = useState(false);
+
+  // Check scroll position
+  const checkScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    setShowTopFade(scrollTop > 5);
+    setShowBottomFade(scrollTop + clientHeight < scrollHeight - 5);
+  }, []);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    
+    // Initial check
+    checkScroll();
+    
+    // Listen to scroll events
+    container.addEventListener('scroll', checkScroll);
+    return () => container.removeEventListener('scroll', checkScroll);
+  }, [checkScroll]);
+
+  // 自动滚动到激活的工具按钮（当 Agent 调用时）
+  useEffect(() => {
+    if (activePanel === 'none') return;
+    
+    const container = scrollContainerRef.current;
+    const toolElement = toolRefs.current.get(activePanel);
+    
+    if (container && toolElement) {
+      const containerRect = container.getBoundingClientRect();
+      const toolRect = toolElement.getBoundingClientRect();
+      
+      // 检查元素是否在可视区域内
+      const isAbove = toolRect.top < containerRect.top;
+      const isBelow = toolRect.bottom > containerRect.bottom;
+      
+      if (isAbove || isBelow) {
+        // 平滑滚动到元素位置，让元素居中显示
+        const scrollTarget = toolElement.offsetTop - container.clientHeight / 2 + toolElement.clientHeight / 2;
+        container.scrollTo({ top: scrollTarget, behavior: 'smooth' });
+      }
+    }
+  }, [activePanel]);
+
+  // Scroll handlers
+  const scrollUp = () => {
+    scrollContainerRef.current?.scrollBy({ top: -100, behavior: 'smooth' });
+  };
+
+  const scrollDown = () => {
+    scrollContainerRef.current?.scrollBy({ top: 100, behavior: 'smooth' });
+  };
+
+  const togglePanel = (panel: ActivePanelType) => {
+    const newState = activePanel === panel ? 'none' : panel;
+    setActivePanel(newState);
+    
+    // 打开待办面板时播放动作
+    if (panel === 'todo' && newState === 'todo') {
+      if (videoAvatarRef.current) {
+        videoAvatarRef.current.playAction('wave');
+      }
+    }
+  };
+
+  const tools = [
+    { id: 'health' as const, icon: <Activity size={22} />, label: '健康' },
+    { id: 'weather' as const, icon: <CloudSun size={22} />, label: '天气' },
+    { id: 'fortune' as const, icon: <Sparkles size={22} />, label: '占卜' },
+    { id: 'todo' as const, icon: <CheckSquare size={22} />, label: '待办', notification: hasNewTodo },
+    { id: 'skills' as const, icon: <Zap size={22} />, label: '技能' },
+    { id: 'voice' as const, icon: <Mic2 size={22} />, label: '声音' },
+    { id: 'watcha' as const, icon: <img src="/watcha.svg" alt="Watcha" className="w-5 h-5" style={{ filter: activePanel === 'watcha' ? 'none' : 'opacity(0.6)' }} />, label: 'Watcha' },
+  ];
+
+  return (
+    <div className="relative flex flex-col items-center h-full max-h-[85vh]">
+      {/* Top Scroll Button */}
+      <div 
+        className={`flex-shrink-0 mb-1 sm:mb-2 transition-all duration-300 ${
+          showTopFade ? 'opacity-100' : 'opacity-0 pointer-events-none h-0 mb-0'
+        }`}
+      >
+        <button
+          onClick={scrollUp}
+          className="p-1.5 sm:p-2 rounded-full bg-white/80 backdrop-blur-sm shadow-md hover:bg-white hover:shadow-lg transition-all duration-200 group"
+          aria-label="向上滚动"
+        >
+          <ChevronUp size={14} className="sm:w-4 sm:h-4 text-[#8b7b6d] group-hover:text-[#5c4d43] transition-colors" />
+        </button>
+      </div>
+
+      {/* Scrollable Tools Container - 响应式高度和间距 */}
+      <div 
+        ref={scrollContainerRef}
+        className="flex flex-col gap-1 sm:gap-2 flex-1 overflow-y-auto no-scrollbar py-1"
+      >
+        {tools.map((tool) => (
+          <div 
+            key={tool.id} 
+            ref={(el) => { if (el) toolRefs.current.set(tool.id, el); }}
+          >
+            <ToolbarIcon
+              icon={tool.icon}
+              active={activePanel === tool.id}
+              onClick={() => togglePanel(tool.id)}
+              label={tool.label}
+              notification={tool.notification}
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* Bottom Scroll Button */}
+      <div 
+        className={`flex-shrink-0 mt-1 sm:mt-2 transition-all duration-300 ${
+          showBottomFade ? 'opacity-100' : 'opacity-0 pointer-events-none h-0 mt-0'
+        }`}
+      >
+        <button
+          onClick={scrollDown}
+          className="p-1.5 sm:p-2 rounded-full bg-white/80 backdrop-blur-sm shadow-md hover:bg-white hover:shadow-lg transition-all duration-200 group"
+          aria-label="向下滚动"
+        >
+          <ChevronDown size={14} className="sm:w-4 sm:h-4 text-[#8b7b6d] group-hover:text-[#5c4d43] transition-colors" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Helper Component for Toolbar Icons - 响应式设计
+const ToolbarIcon = ({ icon, active, onClick, label, notification }: { 
   icon: React.ReactNode, 
   active: boolean, 
   onClick: () => void, 
   label: string, 
-  notification?: boolean,
-  position?: 'left' | 'right'
+  notification?: boolean
 }) => (
     <div className="relative group flex flex-col items-center">
         <button 
             onClick={onClick}
-            className={`toolbar-btn w-12 h-12 rounded-xl flex items-center justify-center ${
-              active ? 'active' : ''
-            } ${notification ? 'animate-shake' : ''}`}
+            className={`
+              toolbar-btn flex items-center justify-center transition-all duration-300
+              w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14
+              rounded-xl sm:rounded-2xl
+              ${active ? 'active bg-white/90 shadow-lg scale-105' : 'hover:bg-white/60'}
+              ${notification ? 'animate-shake' : ''}
+            `}
         >
-            {icon}
+            <span className="scale-75 sm:scale-90 md:scale-100">
+              {icon}
+            </span>
             {notification && (
-                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-[#f5f0e8] shadow-sm"></span>
+                <span className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-rose-500 rounded-full border-2 border-[#f5f0e8] shadow-sm animate-pulse"></span>
             )}
         </button>
-        {/* Label below icon */}
-        <span className={`toolbar-label ${active ? 'active' : ''}`}>
+        {/* Label below icon - 响应式字体 */}
+        <span className={`
+          toolbar-label mt-0.5 sm:mt-1 font-medium transition-colors
+          text-[10px] sm:text-xs
+          ${active ? 'text-[#5c4d43]' : 'text-[#a89b8c]'}
+        `}>
             {label}
         </span>
     </div>

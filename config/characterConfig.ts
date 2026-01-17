@@ -10,24 +10,49 @@ import { VideoStateID, VideoState, StateMachineConfig } from '../services/charac
 /**
  * 视频文件映射说明：
  * 
- * 根据 /public/character/ 目录下的视频文件：
- * - 1.mp4: 待机中间（循环）
- * - 2.mp4: 过渡动画（中间 → 左边）
- * - 3.mp4: 待机左边（循环）
- * - 4.mp4: 过渡动画（左边 → 中间）
- * - 5.mp4: 说话/动作（单次）
+ * 所有视频已转换为透明背景 WebM 格式 (VP9 + Opus)
+ * 详细动作清单请查看: /public/character/VIDEO_ACTIONS.md
  * 
- * 请根据实际视频内容调整下面的映射！
+ * 基础动作：
+ * - action_1.webm: 待机中间（循环）
+ * - action_2.webm: 过渡动画（中间 → 左边）
+ * - action_3.webm: 待机左边（循环）
+ * - action_4.webm: 过渡动画（左边 → 中间）
+ * - action_5.webm: 说话/动作（单次）
+ * - idle.webm: 默认待机动画（循环）
+ * 
+ * 情绪与动作：
+ * - happy.webm, excited.webm, rage.webm, scared.webm, disapprove.webm
+ * - singing.webm, listening_music.webm, jump.webm
+ * - using_phone.webm, checking_phone.webm, taking_notes.webm
  */
 
 // 视频路径常量
 const VIDEO_PATHS = {
-  IDLE_CENTER: '/character/1.mp4',
-  TRANS_C2L: '/character/2.mp4',
-  IDLE_LEFT: '/character/3.mp4',
-  TRANS_L2C: '/character/4.mp4',
-  ACTION_SPEAKING: '/character/5.mp4',
-  ACTION_TODO: '/character/6_transparent_original_color.webm',  // 待办动作（透明背景 - 自然色彩版）
+  // 基础状态
+  IDLE_CENTER: '/character/action_1.webm',
+  TRANS_C2L: '/character/action_2.webm',
+  IDLE_LEFT: '/character/action_3.webm',
+  TRANS_L2C: '/character/action_4.webm',
+  ACTION_SPEAKING: '/character/action_5.webm',
+  
+  // 默认待机
+  IDLE_DEFAULT: '/character/idle.webm',
+  
+  // 情绪表达
+  EMOTION_HAPPY: '/character/happy.webm',
+  EMOTION_EXCITED: '/character/excited.webm',
+  EMOTION_RAGE: '/character/rage.webm',
+  EMOTION_SCARED: '/character/scared.webm',
+  EMOTION_DISAPPROVE: '/character/disapprove.webm',
+  
+  // 活动动作
+  ACTION_SINGING: '/character/singing.webm',
+  ACTION_LISTENING: '/character/listening_music.webm',
+  ACTION_JUMP: '/character/jump.webm',
+  ACTION_PHONE: '/character/using_phone.webm',
+  ACTION_CHECK_PHONE: '/character/checking_phone.webm',
+  ACTION_NOTES: '/character/taking_notes.webm',
 } as const;
 
 /**
@@ -94,10 +119,10 @@ export function createCustomConfig(): StateMachineConfig {
     preloadStates: [VideoStateID.IDLE_CENTER],
   });
 
-  // 待办动作（点击待办按钮时触发）
+  // 挥手动作（点击待办按钮时触发 - 使用默认待机动画）
   states.set(VideoStateID.ACTION_WAVE, {
     stateID: VideoStateID.ACTION_WAVE,
-    videoSource: VIDEO_PATHS.ACTION_TODO,
+    videoSource: VIDEO_PATHS.IDLE_DEFAULT,
     isLoop: false,
     nextStateID: VideoStateID.IDLE_CENTER,
     preloadStates: [VideoStateID.IDLE_CENTER],
@@ -111,19 +136,71 @@ export function createCustomConfig(): StateMachineConfig {
 }
 
 /**
- * 扩展配置示例：添加右侧面板支持
+ * 扩展配置示例：添加更多情绪和动作支持
  * 
- * 如果有更多视频文件，可以添加右侧相关状态：
+ * 使用新的透明背景动作视频
  */
 export function createFullConfig(): StateMachineConfig {
   const baseConfig = createCustomConfig();
   
-  // 示例：添加右侧状态（需要对应的视频文件）
-  // baseConfig.states.set(VideoStateID.IDLE_RIGHT, { ... });
-  // baseConfig.states.set(VideoStateID.TRANS_CENTER_TO_RIGHT, { ... });
-  // baseConfig.states.set(VideoStateID.TRANS_RIGHT_TO_CENTER, { ... });
+  // 可以根据需要添加更多自定义动作状态
+  // 例如添加情绪反应：
+  /*
+  baseConfig.states.set('ACTION_HAPPY' as VideoStateID, {
+    stateID: 'ACTION_HAPPY' as VideoStateID,
+    videoSource: VIDEO_PATHS.EMOTION_HAPPY,
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+  
+  baseConfig.states.set('ACTION_EXCITED' as VideoStateID, {
+    stateID: 'ACTION_EXCITED' as VideoStateID,
+    videoSource: VIDEO_PATHS.EMOTION_EXCITED,
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+  */
   
   return baseConfig;
+}
+
+/**
+ * 创建带有丰富情绪表达的配置
+ * 包含所有情绪和活动动作
+ */
+export function createEmotionalConfig(): StateMachineConfig {
+  const config = createCustomConfig();
+  const { states } = config;
+  
+  // 情绪动作映射
+  const emotionActions = [
+    { id: 'ACTION_HAPPY', video: VIDEO_PATHS.EMOTION_HAPPY },
+    { id: 'ACTION_EXCITED', video: VIDEO_PATHS.EMOTION_EXCITED },
+    { id: 'ACTION_RAGE', video: VIDEO_PATHS.EMOTION_RAGE },
+    { id: 'ACTION_SCARED', video: VIDEO_PATHS.EMOTION_SCARED },
+    { id: 'ACTION_DISAPPROVE', video: VIDEO_PATHS.EMOTION_DISAPPROVE },
+    { id: 'ACTION_SINGING', video: VIDEO_PATHS.ACTION_SINGING },
+    { id: 'ACTION_LISTENING', video: VIDEO_PATHS.ACTION_LISTENING },
+    { id: 'ACTION_JUMP', video: VIDEO_PATHS.ACTION_JUMP },
+    { id: 'ACTION_PHONE', video: VIDEO_PATHS.ACTION_PHONE },
+    { id: 'ACTION_CHECK_PHONE', video: VIDEO_PATHS.ACTION_CHECK_PHONE },
+    { id: 'ACTION_NOTES', video: VIDEO_PATHS.ACTION_NOTES },
+  ];
+  
+  // 添加所有情绪动作到状态机
+  emotionActions.forEach(({ id, video }) => {
+    states.set(id as VideoStateID, {
+      stateID: id as VideoStateID,
+      videoSource: video,
+      isLoop: false,
+      nextStateID: VideoStateID.IDLE_CENTER,
+      preloadStates: [VideoStateID.IDLE_CENTER],
+    });
+  });
+  
+  return config;
 }
 
 /**

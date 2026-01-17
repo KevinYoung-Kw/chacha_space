@@ -77,51 +77,52 @@ interface VideoBuffer {
 
 /**
  * 创建默认状态配置
- * 根据实际视频文件映射配置
+ * 使用透明背景 WebM 格式视频 (VP9 + Opus)
+ * 详细动作清单: /public/character/VIDEO_ACTIONS.md
  */
 export function createDefaultConfig(): StateMachineConfig {
   const states = new Map<VideoStateID, VideoState>();
 
-  // 待机状态 - 中间 (循环)
+  // 待机状态 - 中间 (循环) - 使用 action_1.webm
   states.set(VideoStateID.IDLE_CENTER, {
     stateID: VideoStateID.IDLE_CENTER,
-    videoSource: '/character/1.mp4',
+    videoSource: '/character/action_1.webm',
     isLoop: true,
     nextStateID: null,
     preloadStates: [VideoStateID.TRANS_CENTER_TO_LEFT, VideoStateID.TRANS_CENTER_TO_RIGHT],
   });
 
-  // 过渡：中间 → 左边 (单次)
+  // 过渡：中间 → 左边 (单次) - 使用 action_2.webm
   states.set(VideoStateID.TRANS_CENTER_TO_LEFT, {
     stateID: VideoStateID.TRANS_CENTER_TO_LEFT,
-    videoSource: '/character/2.mp4',
+    videoSource: '/character/action_2.webm',
     isLoop: false,
     nextStateID: VideoStateID.IDLE_LEFT,
     preloadStates: [VideoStateID.IDLE_LEFT],
   });
 
-  // 待机状态 - 左边 (循环)
+  // 待机状态 - 左边 (循环) - 使用 action_3.webm
   states.set(VideoStateID.IDLE_LEFT, {
     stateID: VideoStateID.IDLE_LEFT,
-    videoSource: '/character/3.mp4',
+    videoSource: '/character/action_3.webm',
     isLoop: true,
     nextStateID: null,
     preloadStates: [VideoStateID.TRANS_LEFT_TO_CENTER],
   });
 
-  // 过渡：左边 → 中间 (单次)
+  // 过渡：左边 → 中间 (单次) - 使用 action_4.webm
   states.set(VideoStateID.TRANS_LEFT_TO_CENTER, {
     stateID: VideoStateID.TRANS_LEFT_TO_CENTER,
-    videoSource: '/character/4.mp4',
+    videoSource: '/character/action_4.webm',
     isLoop: false,
     nextStateID: VideoStateID.IDLE_CENTER,
     preloadStates: [VideoStateID.IDLE_CENTER],
   });
 
-  // 一次性动作 - 说话
+  // 一次性动作 - 说话 - 使用 action_5.webm
   states.set(VideoStateID.ACTION_SPEAKING, {
     stateID: VideoStateID.ACTION_SPEAKING,
-    videoSource: '/character/5.mp4',
+    videoSource: '/character/action_5.webm',
     isLoop: false,
     nextStateID: VideoStateID.IDLE_CENTER,
     preloadStates: [VideoStateID.IDLE_CENTER],
