@@ -233,7 +233,10 @@ router.post('/message', async (req: Request, res: Response<ApiResponse>) => {
     const toolResults: { name: string; result: any }[] = [];
     const actions: { type: string; data: any }[] = [];
 
+    console.log('[Chat] 🔧 Processing', response.toolCalls.length, 'tool calls');
+    
     for (const toolCall of response.toolCalls) {
+      console.log('[Chat] 🛠️  Executing tool:', toolCall.name, 'with args:', JSON.stringify(toolCall.arguments).substring(0, 100));
       const result = await executeToolCall(userId, toolCall, healthData);
       toolResults.push({ name: toolCall.name, result: result.data });
       if (result.action) {

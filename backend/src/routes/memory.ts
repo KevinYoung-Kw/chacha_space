@@ -26,7 +26,11 @@ router.get('/', (req: Request, res: Response<ApiResponse>) => {
     const page = parseInt(req.query.page as string) || 1;
     const pageSize = parseInt(req.query.pageSize as string) || 20;
 
+    console.log('[Memory API] 📖 Getting memories for user:', userId, 'page:', page, 'pageSize:', pageSize);
+    
     const result = getAllMemories(userId, page, pageSize);
+    
+    console.log('[Memory API] 📊 Found', result.total, 'memories, returning', result.memories.length, 'on this page');
 
     res.json({
       success: true,
@@ -71,6 +75,8 @@ router.post('/', (req: Request, res: Response<ApiResponse<Memory>>) => {
     const userId = req.user!.userId;
     const { content, type, importance } = req.body;
 
+    console.log('[Memory API] 💾 Saving memory for user:', userId, 'type:', type, 'content:', content?.substring(0, 50));
+
     if (!content) {
       return res.status(400).json({ success: false, error: '记忆内容不能为空' });
     }
@@ -83,6 +89,8 @@ router.post('/', (req: Request, res: Response<ApiResponse<Memory>>) => {
     }
 
     const memory = saveMemory(userId, content, type, importance || 5);
+    
+    console.log('[Memory API] ✅ Memory saved successfully, id:', memory.id);
 
     res.status(201).json({
       success: true,

@@ -10,6 +10,7 @@ import HealthPanel from './components/tools/HealthPanel';
 import TodoPanel from './components/tools/TodoPanel';
 import SkillsPanel from './components/tools/SkillsPanel';
 import AnimationPanel from './components/tools/AnimationPanel';
+import MemoryPanel from './components/tools/MemoryPanel';
 // import VoicePanel from './components/tools/VoicePanel'; // 已移除音色选择功能
 import WatchaPanel from './components/tools/WatchaPanel';
 import AffinityIndicator from './components/AffinityIndicator';
@@ -20,10 +21,11 @@ import { createEmotionalConfig } from './config/characterConfig';
 import { api, authApi, chatApi, categoryApi, healthApi, todoApi, weatherApi, ttsApi, emotionApi } from './services/api';
 import { decodeAudioData, playAudioBuffer } from './services/audioService';
 import { loadAffinityData, updateAffinity } from './services/affinityService';
-import { CloudSun, Sparkles, Mic2, Activity, CheckSquare, Zap, ChevronUp, ChevronDown, LogOut, Film } from 'lucide-react';
+// 记忆功能已由后端AI自动处理，前端不再主动生成记忆
+import { CloudSun, Sparkles, Mic2, Activity, CheckSquare, Zap, ChevronUp, ChevronDown, LogOut, Film, Brain } from 'lucide-react';
 
 // Panel Types - 统一管理，所有面板都在右侧显示
-type ActivePanelType = 'none' | 'weather' | 'fortune' | 'health' | 'todo' | 'skills' | 'watcha' | 'animation' | 'affinity';
+type ActivePanelType = 'none' | 'weather' | 'fortune' | 'health' | 'todo' | 'skills' | 'memory' | 'watcha' | 'animation' | 'affinity';
 
 // 用户信息类型
 interface UserProfile {
@@ -151,6 +153,7 @@ const App: React.FC = () => {
     if (emotion && videoAvatarRef.current) {
       videoAvatarRef.current.playAction(emotion);
     }
+    // 记忆由后端AI自动生成
   };
 
   // --- Refs ---
@@ -328,6 +331,8 @@ const App: React.FC = () => {
 
         addMessage('assistant', content);
         setState(AssistantState.SPEAKING);
+        
+        // 记忆由后端AI自动生成，无需前端处理
         
         // 根据情绪检测结果播放对应动画
         if (emotionResult.success && emotionResult.data) {
@@ -830,6 +835,11 @@ const App: React.FC = () => {
                       }}
                     />
                   )}
+                  {activePanel === 'memory' && (
+                    <MemoryPanel 
+                      onClose={() => setActivePanel('none')}
+                    />
+                  )}
                   {activePanel === 'affinity' && (
                     <AffinityDetailPanel 
                       affinity={affinity}
@@ -926,9 +936,10 @@ const ScrollableToolbar = ({
     { id: 'fortune' as const, icon: <Sparkles size={22} />, label: '占卜' },
     { id: 'todo' as const, icon: <CheckSquare size={22} />, label: '待办', notification: hasNewTodo },
     { id: 'skills' as const, icon: <Zap size={22} />, label: '技能' },
+    { id: 'memory' as const, icon: <Brain size={22} />, label: '记忆' },
     { id: 'affinity' as const, icon: <AffinityIndicator variant="toolbar" affinity={affinity} />, label: '好感度' },
     { id: 'watcha' as const, icon: <img src="/watcha.svg" alt="Watcha" className="w-5 h-5" style={{ filter: activePanel === 'watcha' ? 'none' : 'opacity(0.6)' }} />, label: 'Watcha' },
-    { id: 'animation' as const, icon: <Film size={22} />, label: '点播' },
+    { id: 'animation' as const, icon: <Film size={22} />, label: '动作' },
   ];
 
   return (

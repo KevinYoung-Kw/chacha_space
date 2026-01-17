@@ -65,6 +65,17 @@ export interface CustomSkill {
   response: string;
 }
 
+// Memory (记忆系统)
+export interface Memory {
+  id: string;
+  userId: string;
+  type: 'fact' | 'preference' | 'event' | 'relationship';
+  content: string;
+  importance: number; // 1-10 重要性评分
+  lastAccessed: string;
+  createdAt: string;
+}
+
 // User Profile from Onboarding
 export interface UserProfile {
   name: string;

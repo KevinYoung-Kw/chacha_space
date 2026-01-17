@@ -84,9 +84,11 @@ interface WeatherData {
 
 interface Memory {
   id: string;
-  type: string;
+  userId: string;
+  type: 'fact' | 'preference' | 'event' | 'relationship';
   content: string;
   importance: number;
+  lastAccessed: string;
   createdAt: string;
 }
 
