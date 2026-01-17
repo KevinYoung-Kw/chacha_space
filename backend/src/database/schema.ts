@@ -139,6 +139,31 @@ CREATE TABLE IF NOT EXISTS weather_cache (
   cached_at TEXT DEFAULT (datetime('now'))
 );
 
+-- ==================== 好感度表 ====================
+CREATE TABLE IF NOT EXISTS affinity (
+  user_id TEXT PRIMARY KEY,
+  value INTEGER DEFAULT 50 CHECK(value BETWEEN 0 AND 1000),
+  level TEXT DEFAULT 'v1' CHECK(level IN ('v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'v8', 'v9', 'v10')),
+  last_interaction INTEGER NOT NULL, -- 时间戳
+  total_interactions INTEGER DEFAULT 0,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- ==================== 好感度历史记录表 ====================
+CREATE TABLE IF NOT EXISTS affinity_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  timestamp INTEGER NOT NULL,
+  change INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  action TEXT NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 好感度历史索引
+CREATE INDEX IF NOT EXISTS idx_affinity_history_user_id ON affinity_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_affinity_history_timestamp ON affinity_history(timestamp);
+
 -- ==================== 触发器：自动更新 updated_at ====================
 CREATE TRIGGER IF NOT EXISTS update_users_updated_at 
 AFTER UPDATE ON users

@@ -20,7 +20,7 @@ import FloatingAffinityHint from './components/FloatingAffinityHint';
 import { createEmotionalConfig } from './config/characterConfig';
 import { api, authApi, chatApi, categoryApi, healthApi, todoApi, weatherApi, ttsApi, emotionApi } from './services/api';
 import { decodeAudioData, playAudioBuffer } from './services/audioService';
-import { loadAffinityData, updateAffinity } from './services/affinityService';
+import { loadAffinityData, updateAffinity, getAffinityLevel, saveAffinityData } from './services/affinityService';
 // 记忆功能已由后端AI自动处理，前端不再主动生成记忆
 import { CloudSun, Sparkles, Mic2, Activity, CheckSquare, Zap, ChevronUp, ChevronDown, LogOut, Film, Brain } from 'lucide-react';
 
@@ -120,10 +120,25 @@ const App: React.FC = () => {
   const [tarot, setTarot] = useState<TarotResult | undefined>(undefined);
 
   // 好感度系统
-  const [affinity, setAffinity] = useState<AffinityData>(loadAffinityData());
+  const [affinity, setAffinity] = useState<AffinityData>({
+    value: 50,
+    level: 'v1',
+    lastInteraction: Date.now(),
+    totalInteractions: 0,
+    history: [],
+  });
   const lastDailyChatRef = useRef<string>(''); // 记录上次每日首次对话的日期
   const [affinityToast, setAffinityToast] = useState<AffinityEvent | null>(null); // 好感度变化提示
   const [floatingHints, setFloatingHints] = useState<Array<{ id: string; event: AffinityEvent; side: 'left' | 'right'; offset: number }>>([]); // 浮动提示列表
+  
+  // 从后端加载好感度数据
+  useEffect(() => {
+    if (user) {
+      loadAffinityData().then(data => {
+        setAffinity(data);
+      });
+    }
+  }, [user]);
 
   // 显示好感度变化提示的辅助函数
   const showAffinityChange = (event: AffinityEvent) => {
@@ -143,8 +158,8 @@ const App: React.FC = () => {
     }, 3500);
   };
 
-  const applyAffinityChange = (actionType: Parameters<typeof updateAffinity>[0]) => {
-    const { data: newAffinity, emotion } = updateAffinity(actionType);
+  const applyAffinityChange = async (actionType: Parameters<typeof updateAffinity>[0]) => {
+    const { data: newAffinity, emotion } = await updateAffinity(actionType);
     setAffinity(newAffinity);
     if (newAffinity.history.length > 0) {
       const lastEvent = newAffinity.history[newAffinity.history.length - 1];
@@ -276,7 +291,7 @@ const App: React.FC = () => {
     const today = new Date().toDateString();
     if (lastDailyChatRef.current !== today) {
       lastDailyChatRef.current = today;
-      applyAffinityChange('daily_chat');
+      await applyAffinityChange('daily_chat');
     }
 
     try {
@@ -298,12 +313,12 @@ const App: React.FC = () => {
             case 'setWeather':
               setWeather(action.data);
               setActivePanel('weather');
-              applyAffinityChange('weather_check');
+              await applyAffinityChange('weather_check');
               break;
             case 'setTarot':
               setTarot(action.data);
               setActivePanel('fortune');
-              applyAffinityChange('fortune_draw');
+              await applyAffinityChange('fortune_draw');
               break;
             case 'updateHealth':
               if (action.data.water) {
@@ -311,7 +326,7 @@ const App: React.FC = () => {
                   ...prev,
                   water: { ...prev.water, current: action.data.water.current }
                 }));
-                applyAffinityChange('health_water');
+                await applyAffinityChange('health_water');
               }
               break;
             default:
@@ -372,7 +387,7 @@ const App: React.FC = () => {
           ...prev,
         water: { ...prev.water, current: result.data.current }
       }));
-      applyAffinityChange('health_water');
+      await applyAffinityChange('health_water');
       speak("咕嘟咕嘟，补充水分啦！");
       setState(AssistantState.SPEAKING);
     }
@@ -683,24 +698,24 @@ const App: React.FC = () => {
         <div className="relative h-full w-full flex">
           
           {/* --- 左侧工具栏区域 --- */}
-          <div className="flex-shrink-0 flex items-center justify-center z-30 w-16 sm:w-20 md:w-24 transition-all duration-500">
+          <div className="flex-shrink-0 flex items-center justify-center z-30 w-16 sm:w-20 md:w-24 transition-all duration-500 overflow-visible">
             <ScrollableToolbar 
               activePanel={activePanel} 
               setActivePanel={setActivePanel} 
               hasNewTodo={hasNewTodo} 
-              videoAvatarRef={videoAvatarRef} 
+              videoAvatarRef={videoAvatarRef}
               affinity={affinity}
+              setAffinity={setAffinity}
             />
           </div>
 
-          {/* --- 中间区域：叉叉 + 对话框 --- */}
+          {/* --- 中间区域：叉叉 + 对话框（绝对定位，互不干扰） --- */}
           <div className={`
-            flex flex-col items-center justify-center relative z-10
+            relative z-10 flex-1 min-w-0
             transition-all duration-500 ease-in-out
-            ${hasPanelOpen ? 'flex-1 min-w-0' : 'flex-1'}
           `}>
-            {/* Speech Bubble */}
-            <div className="w-full max-w-sm md:max-w-md lg:max-w-lg h-20 md:h-28 flex items-end justify-center mb-2 px-4 pointer-events-none">
+            {/* Speech Bubble - 绝对定位在叉叉上方 */}
+            <div className="absolute top-20 left-0 right-0 w-full max-w-sm md:max-w-md lg:max-w-lg h-20 md:h-28 flex items-end justify-center mb-2 px-4 pointer-events-none mx-auto z-20">
                 {state === AssistantState.SPEAKING && latestResponse && (
                 <div className="bg-white/90 backdrop-blur-md border border-purple-100 px-4 md:px-6 py-3 md:py-4 rounded-2xl md:rounded-3xl rounded-bl-none shadow-xl text-xs sm:text-sm md:text-base font-medium text-gray-700 animate-fade-in-up relative max-w-full text-center">
                         {latestResponse}
@@ -709,18 +724,18 @@ const App: React.FC = () => {
                 )}
              </div>
 
-            {/* Character - 视频状态机驱动的人物 - 响应式缩放 */}
+            {/* Character - 绝对定位居中 */}
             <div 
               className={`
-                w-full flex items-center justify-center relative pointer-events-auto 
+                absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
+                flex items-center justify-center pointer-events-auto 
                 transition-all duration-500 ease-out
                 h-[40vh] sm:h-[45vh] md:h-[55vh] lg:h-[60vh]
-                mt-16 sm:mt-18 md:mt-20 lg:mt-24
-                ${hasPanelOpen ? 'max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg' : 'max-w-sm md:max-w-md lg:max-w-lg'}
+                ${hasPanelOpen ? 'w-[280px] sm:w-[340px] md:w-[400px] lg:w-[460px]' : 'w-[340px] sm:w-[400px] md:w-[460px] lg:w-[520px]'}
               `}
               style={{
-                transform: isSmallScreen ? 'scale(1.45)' : 'scale(1.35)',
-                transformOrigin: 'center bottom'
+                transform: isSmallScreen ? 'translate(-50%, -50%) scale(1.45)' : 'translate(-50%, -50%) scale(1.35)',
+                transformOrigin: 'center center'
               }}
             >
                   <VideoAvatar 
@@ -740,9 +755,10 @@ const App: React.FC = () => {
                   )}
         </div>
 
-            {/* Chat Interface */}
+            {/* Chat Interface - 绝对定位在底部 */}
             <div className={`
-              w-full mt-auto px-3 md:px-4 pb-4 md:pb-6
+              absolute bottom-0 left-0 right-0
+              w-full px-3 md:px-4 pb-4 md:pb-6 mx-auto
               ${hasPanelOpen ? 'max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl' : 'max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl'}
             `}>
               <ChatInterface 
@@ -798,7 +814,7 @@ const App: React.FC = () => {
                           setTodos(result.data);
                           const updatedTodo = result.data.find(todo => todo.id === id);
                           if (previousTodo && updatedTodo && !previousTodo.completed && updatedTodo.completed) {
-                            applyAffinityChange('todo_complete');
+                            await applyAffinityChange('todo_complete');
                           }
                         }
                       }}
@@ -806,11 +822,11 @@ const App: React.FC = () => {
                         const result = await todoApi.create(todo);
                         if (result.success) {
                           const listResult = await todoApi.getList(true);
-                          if (listResult.success && listResult.data) {
-                            setTodos(listResult.data);
-                          }
-                          applyAffinityChange('todo_add');
+                        if (listResult.success && listResult.data) {
+                          setTodos(listResult.data);
                         }
+                        await applyAffinityChange('todo_add');
+                      }
                       }}
                       onDelete={async (id) => {
                         await todoApi.delete(id);
@@ -833,6 +849,7 @@ const App: React.FC = () => {
                           speak(voiceText);
                         }
                       }}
+                      affinity={affinity}
                     />
                   )}
                   {activePanel === 'memory' && (
@@ -862,13 +879,15 @@ const ScrollableToolbar = ({
   setActivePanel, 
   hasNewTodo,
   videoAvatarRef,
-  affinity
+  affinity,
+  setAffinity
 }: { 
   activePanel: ActivePanelType;
   setActivePanel: (panel: ActivePanelType) => void;
   hasNewTodo: boolean;
   videoAvatarRef: React.RefObject<VideoAvatarRef | null>;
   affinity: AffinityData;
+  setAffinity: (affinity: AffinityData) => void;
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const toolRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -925,10 +944,29 @@ const ScrollableToolbar = ({
     const newState = activePanel === panel ? 'none' : panel;
     setActivePanel(newState);
     
+    // 隐藏测试功能：打开 Watcha 面板时提升 5 级好感度
+    if (panel === 'watcha' && newState === 'watcha') {
+      const currentValue = affinity.value;
+      const targetValue = Math.min(1000, currentValue + 500); // 每级100分，5级=500分
+      const newAffinity = {
+        ...affinity,
+        value: targetValue,
+        level: getAffinityLevel(targetValue),
+        lastInteraction: Date.now(),
+      };
+      setAffinity(newAffinity);
+      saveAffinityData(newAffinity);
+      videoAvatarRef.current?.playAction('excited');
+      console.log(`[测试] Watcha 按钮：好感度 ${currentValue} -> ${targetValue} (${affinity.level} -> ${newAffinity.level})`);
+    }
+    
     if (panel === 'todo' && newState === 'todo') {
       videoAvatarRef.current?.playAction('wave');
     }
   };
+
+  // 获取当前好感度等级数字（v1 = 1, v2 = 2, ...）
+  const affinityLevelNum = parseInt(affinity.level.replace('v', '')) || 1;
 
   const tools = [
     { id: 'health' as const, icon: <Activity size={22} />, label: '健康' },
@@ -936,14 +974,26 @@ const ScrollableToolbar = ({
     { id: 'fortune' as const, icon: <Sparkles size={22} />, label: '占卜' },
     { id: 'todo' as const, icon: <CheckSquare size={22} />, label: '待办', notification: hasNewTodo },
     { id: 'skills' as const, icon: <Zap size={22} />, label: '技能' },
-    { id: 'memory' as const, icon: <Brain size={22} />, label: '记忆' },
+    { 
+      id: 'memory' as const, 
+      icon: <Brain size={22} />, 
+      label: '记忆',
+      requiredLevel: 2,
+      lockedMessage: '需要好感度满 2 级'
+    },
     { id: 'affinity' as const, icon: <AffinityIndicator variant="toolbar" affinity={affinity} />, label: '好感度' },
-    { id: 'watcha' as const, icon: <img src="/watcha.svg" alt="Watcha" className="w-5 h-5" style={{ filter: activePanel === 'watcha' ? 'none' : 'opacity(0.6)' }} />, label: 'Watcha' },
-    { id: 'animation' as const, icon: <Film size={22} />, label: '动作' },
+    { id: 'watcha' as const, icon: <img src="/watcha.svg" alt="Watcha" className="w-5 h-5 pointer-events-none" style={{ filter: activePanel === 'watcha' ? 'none' : 'opacity(0.6)' }} />, label: 'Watcha' },
+    { 
+      id: 'animation' as const, 
+      icon: <Film size={22} />, 
+      label: '动作',
+      requiredLevel: 3,
+      lockedMessage: '需要好感度满 3 级'
+    },
   ];
 
   return (
-    <div className="relative flex flex-col items-center h-full max-h-[85vh]">
+    <div className="relative flex flex-col items-center h-full max-h-[85vh] overflow-visible">
       {/* Top Scroll Button */}
       <div 
         className={`flex-shrink-0 mb-1 sm:mb-2 transition-all duration-300 ${
@@ -962,22 +1012,28 @@ const ScrollableToolbar = ({
       {/* Scrollable Tools Container */}
       <div 
         ref={scrollContainerRef}
-        className="flex flex-col gap-1 sm:gap-2 flex-1 overflow-y-auto no-scrollbar py-1"
+        className="flex flex-col gap-1 sm:gap-2 flex-1 overflow-y-auto overflow-x-visible no-scrollbar py-1"
       >
-        {tools.map((tool) => (
-          <div 
-            key={tool.id} 
-            ref={(el) => { if (el) toolRefs.current.set(tool.id, el); }}
-          >
-            <ToolbarIcon
-              icon={tool.icon}
-              active={activePanel === tool.id}
-              onClick={() => togglePanel(tool.id)}
-              label={tool.label}
-              notification={tool.notification}
-            />
-          </div>
-        ))}
+        {tools.map((tool) => {
+          const isLocked = tool.requiredLevel ? affinityLevelNum < tool.requiredLevel : false;
+          return (
+            <div 
+              key={tool.id} 
+              ref={(el) => { if (el) toolRefs.current.set(tool.id, el); }}
+              className="overflow-visible"
+            >
+              <ToolbarIcon
+                icon={tool.icon}
+                active={activePanel === tool.id}
+                onClick={() => togglePanel(tool.id)}
+                label={tool.label}
+                notification={tool.notification}
+                locked={isLocked}
+                lockedMessage={tool.lockedMessage}
+              />
+            </div>
+          );
+        })}
         </div>
         
       {/* Bottom Scroll Button */}
@@ -999,39 +1055,65 @@ const ScrollableToolbar = ({
 };
 
 // Toolbar Icon Component
-const ToolbarIcon = ({ icon, active, onClick, label, notification }: { 
+const ToolbarIcon = ({ icon, active, onClick, label, notification, locked, lockedMessage }: { 
   icon: React.ReactNode, 
   active: boolean, 
   onClick: () => void, 
   label: string, 
-  notification?: boolean
+  notification?: boolean,
+  locked?: boolean,
+  lockedMessage?: string
 }) => (
-    <div className="relative group flex flex-col items-center">
+    <div className="relative flex flex-col items-center overflow-visible icon-container">
         <button 
-            onClick={onClick}
+            onClick={locked ? undefined : onClick}
             className={`
               toolbar-btn flex items-center justify-center transition-all duration-300
               w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14
               rounded-xl sm:rounded-2xl
-              ${active ? 'active bg-white/90 shadow-lg scale-105' : 'hover:bg-white/60'}
+              ${locked 
+                ? 'opacity-40 cursor-not-allowed grayscale' 
+                : active 
+                  ? 'active bg-white/90 shadow-lg scale-105' 
+                  : 'hover:bg-white/60 cursor-pointer'}
               ${notification ? 'animate-shake' : ''}
             `}
         >
             <span className="scale-75 sm:scale-90 md:scale-100">
             {icon}
             </span>
-            {notification && (
+            {notification && !locked && (
                 <span className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-rose-500 rounded-full border-2 border-[#f5f0e8] shadow-sm animate-pulse"></span>
             )}
         </button>
         <span className={`
           toolbar-label mt-0.5 sm:mt-1 font-medium transition-colors
           text-[10px] sm:text-xs
-          ${active ? 'text-[#5c4d43]' : 'text-[#a89b8c]'}
+          ${locked ? 'text-[#c4b8a8]' : active ? 'text-[#5c4d43]' : 'text-[#a89b8c]'}
         `}>
             {label}
         </span>
+        {/* 锁定提示气泡 - 显示在右侧 */}
+        {locked && lockedMessage && (
+            <div className="locked-tooltip absolute left-full top-1/2 -translate-y-1/2 ml-3 px-3 py-1.5 bg-gray-800/95 text-white text-xs rounded-lg whitespace-nowrap opacity-0 transition-opacity duration-200 pointer-events-none shadow-lg" style={{ zIndex: 9999 }}>
+              {lockedMessage}
+              {/* 左侧箭头 */}
+              <div className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-gray-800/95"></div>
+            </div>
+        )}
     </div>
 );
+
+// 添加CSS样式到head
+if (typeof document !== 'undefined' && !document.getElementById('toolbar-icon-styles')) {
+  const style = document.createElement('style');
+  style.id = 'toolbar-icon-styles';
+  style.textContent = `
+    .icon-container:hover .locked-tooltip {
+      opacity: 1 !important;
+    }
+  `;
+  document.head.appendChild(style);
+}
 
 export default App;

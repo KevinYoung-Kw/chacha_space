@@ -22,6 +22,7 @@ import ttsRoutes from './routes/tts';
 import sttRoutes from './routes/stt';
 import memoryRoutes from './routes/memory';
 import emotionRoutes from './routes/emotion';
+import affinityRoutes from './routes/affinity';
 
 // 创建 Express 应用
 const app = express();
@@ -59,6 +60,7 @@ app.use('/api/tts', ttsRoutes);
 app.use('/api', sttRoutes);
 app.use('/api/memories', memoryRoutes);
 app.use('/api/emotion', emotionRoutes);
+app.use('/api/affinity', affinityRoutes);
 
 // ==================== 健康检查 ====================
 

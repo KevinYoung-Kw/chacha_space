@@ -33,38 +33,38 @@ const AffinityIndicator: React.FC<AffinityIndicatorProps> = ({
   const getLevelColor = (level: AffinityLevel): string => {
     try {
       const levelNum = parseInt(level.replace('v', ''));
-      if (isNaN(levelNum)) return 'text-gray-400';
-      if (levelNum <= 2) return 'text-gray-400';
-      if (levelNum <= 4) return 'text-blue-500';
-      if (levelNum <= 6) return 'text-amber-500';
-      if (levelNum <= 8) return 'text-orange-500';
-      return 'text-rose-500';
+      if (isNaN(levelNum)) return 'text-gray-500';
+      if (levelNum <= 2) return 'text-gray-500';
+      if (levelNum <= 4) return 'text-blue-600';
+      if (levelNum <= 6) return 'text-amber-600';
+      if (levelNum <= 8) return 'text-orange-600';
+      return 'text-rose-600';
     } catch {
-      return 'text-gray-400';
+      return 'text-gray-500';
     }
   };
 
   const getLevelFillColor = (level: AffinityLevel): string => {
     try {
       const levelNum = parseInt(level.replace('v', ''));
-      if (isNaN(levelNum)) return '#9ca3af'; // gray-400
-      if (levelNum <= 2) return '#9ca3af'; // gray-400
-      if (levelNum <= 4) return '#3b82f6'; // blue-500
-      if (levelNum <= 6) return '#f59e0b'; // amber-500
-      if (levelNum <= 8) return '#f97316'; // orange-500
-      return '#f43f5e'; // rose-500
+      if (isNaN(levelNum)) return '#6b7280'; // gray-500
+      if (levelNum <= 2) return '#6b7280'; // gray-500
+      if (levelNum <= 4) return '#2563eb'; // blue-600
+      if (levelNum <= 6) return '#d97706'; // amber-600
+      if (levelNum <= 8) return '#ea580c'; // orange-600
+      return '#e11d48'; // rose-600
     } catch {
-      return '#9ca3af';
+      return '#6b7280';
     }
   };
   
   const getLevelBgColor = (level: AffinityLevel): string => {
     const levelNum = parseInt(level.replace('v', ''));
-    if (levelNum <= 2) return 'bg-gray-200';
-    if (levelNum <= 4) return 'bg-blue-200';
-    if (levelNum <= 6) return 'bg-amber-200';
-    if (levelNum <= 8) return 'bg-orange-200';
-    return 'bg-rose-200';
+    if (levelNum <= 2) return 'bg-gray-400';
+    if (levelNum <= 4) return 'bg-blue-500';
+    if (levelNum <= 6) return 'bg-amber-500';
+    if (levelNum <= 8) return 'bg-orange-500';
+    return 'bg-rose-500';
   };
   
   // 计算当前等级内的进度（0-100%）
@@ -82,27 +82,27 @@ const AffinityIndicator: React.FC<AffinityIndicatorProps> = ({
   // 渲染工具栏变体：一个会随好感度垂直填充的爱心
   if (variant === 'toolbar') {
     const fillColor = getLevelFillColor(stats.level);
-    // 整体好感度百分比 (0-1000 -> 0-100%)
-    const totalProgress = (affinity.value / 1000) * 100;
+    // 使用当前等级内的进度 (0-100%)，而不是总体 1000 点的进度，降低压力
+    const currentProgress = stats.progress;
     
     return (
       <div className="relative w-7 h-7 flex items-center justify-center">
         {/* 底层空心心 - 使用与其它图标一致的描边 */}
         <Heart 
           size={22} 
-          className="transition-colors duration-500" 
+          className="text-gray-200 transition-colors duration-500" 
         />
         {/* 上层填充心 - 使用 clip-path 实现垂直填充效果 */}
         <div 
           className="absolute inset-0 flex items-center justify-center overflow-hidden transition-all duration-700 ease-in-out"
           style={{ 
-            clipPath: `inset(${100 - totalProgress}% 0 0 0)`
+            clipPath: `inset(${100 - currentProgress}% 0 0 0)`
           }}
         >
           <Heart 
             size={22} 
-            fill={fillColor}
-            stroke="none"
+            fill="none"
+            stroke={fillColor}
             className="transition-colors duration-500"
           />
         </div>
@@ -127,7 +127,7 @@ const AffinityIndicator: React.FC<AffinityIndicatorProps> = ({
           {stats.level.toUpperCase()}
         </span>
         <span className="text-xs text-gray-500">
-          {affinity.value}
+          {stats.currentLevelExp} / {stats.nextLevelExpNeeded}
         </span>
       </div>
     );
@@ -144,7 +144,7 @@ const AffinityIndicator: React.FC<AffinityIndicatorProps> = ({
           />
           <div className="flex flex-col">
             <span className={`text-sm font-bold ${getLevelColor(stats.level)}`}>
-              {affinity.value} / 1000
+              {stats.currentLevelExp} / {stats.nextLevelExpNeeded}
             </span>
             <span className="text-xs text-gray-500">
               {stats.level.toUpperCase()} · {getLevelName(stats.level)}

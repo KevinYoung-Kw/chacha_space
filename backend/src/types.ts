@@ -146,6 +146,37 @@ export interface TarotResult {
   advice: string;
 }
 
+// ==================== 好感度系统 ====================
+
+export type AffinityLevel = 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'v8' | 'v9' | 'v10';
+
+export type AffinityActionType = 
+  | 'todo_complete'
+  | 'todo_add'
+  | 'health_water'
+  | 'health_goal'
+  | 'weather_check'
+  | 'fortune_draw'
+  | 'daily_chat'
+  | 'positive_reply'
+  | 'negative_reply'
+  | 'no_interaction';
+
+export interface AffinityEvent {
+  timestamp: number;
+  change: number;
+  reason: string;
+  action: string;
+}
+
+export interface AffinityData {
+  value: number; // 0-1000
+  level: AffinityLevel;
+  lastInteraction: number;
+  totalInteractions: number;
+  history: AffinityEvent[];
+}
+
 // ==================== API 响应 ====================
 
 export interface ApiResponse<T = any> {

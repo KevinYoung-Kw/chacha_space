@@ -4,11 +4,18 @@ import { config } from '../config';
 import { JwtPayload, ApiResponse } from '../types';
 
 /**
+ * 扩展 Express Request 以包含 user 属性
+ */
+export interface AuthRequest extends Request {
+  user?: JwtPayload;
+}
+
+/**
  * JWT 认证中间件
  * 验证请求头中的 Bearer Token
  */
 export const authMiddleware = (
-  req: Request,
+  req: AuthRequest,
   res: Response<ApiResponse>,
   next: NextFunction
 ): void => {
@@ -53,7 +60,7 @@ export const authMiddleware = (
  * 如果提供了 Token 则验证，否则继续
  */
 export const optionalAuthMiddleware = (
-  req: Request,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ): void => {
