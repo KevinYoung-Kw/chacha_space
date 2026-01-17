@@ -147,13 +147,6 @@ const VideoAvatar = forwardRef<VideoAvatarRef, VideoAvatarProps>((props, ref) =>
         </div>
       )}
 
-      {/* 状态气泡（可选，用于生产环境的轻量提示） */}
-      {isInitialized && StateUtils.isAction(currentState) && (
-        <div className="absolute top-4 right-4 bg-white/90 backdrop-blur rounded-full px-4 py-2 shadow-lg animate-bounce z-40">
-          {indicator.icon}
-        </div>
-      )}
-
       {/* 交互提示层（首次点击播放） */}
       {isInitialized && (
         <div 

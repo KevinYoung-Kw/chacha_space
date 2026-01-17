@@ -14,12 +14,29 @@ export interface Message {
   timestamp: number;
 }
 
+export interface TodoCategory {
+  id: string;
+  userId: string;
+  name: string;
+  icon: string;
+  color: string;
+  isDefault: boolean;
+  sortOrder: number;
+  createdAt: string;
+}
+
 export interface TodoItem {
   id: string;
   text: string;
   completed: boolean;
-  category?: 'health' | 'work' | 'dev' | 'content';
+  categoryId?: string;
+  categoryName?: string;
+  categoryIcon?: string;
+  categoryColor?: string;
   priority?: 'high' | 'medium' | 'low';
+  deadline?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ForecastDay {

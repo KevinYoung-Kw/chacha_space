@@ -1,0 +1,41 @@
+# Node modules
+node_modules
+backend/node_modules
+
+# Build outputs
+dist
+backend/dist
+.vite
+
+# Development files
+*.log
+.env
+.env.local
+.env.*.local
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test
+coverage
+*.test.ts
+*.spec.ts
+
+# Documentation (optional - remove if you want docs in container)
+*.md
+!README.md
+
+# Temporary files
+tmp
+temp

@@ -1,8 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Square, Wand2, Sparkles, Check, Loader2, Music2, User, Plus, Trash2, Search } from 'lucide-react';
-import { designVoice } from '../../services/minimaxService';
-import { decodeAudioData, playAudioBuffer } from '../../services/audioService';
+import { Play, Square, Sparkles, Check, Music2, User, Trash2, Search } from 'lucide-react';
 import { Voice } from '../../types';
 
 // Curated list of high-quality MiniMax voices
@@ -38,18 +36,6 @@ const VoicePanel: React.FC<VoicePanelProps> = ({ currentVoiceId, onVoiceSelected
     const [customVoices, setCustomVoices] = useState<Voice[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // --- Creation State ---
-    const [prompt, setPrompt] = useState('讲述悬疑故事的播音员，声音低沉富有磁性，语速时快时慢，营造紧张神秘的氛围。');
-    const [previewText, setPreviewText] = useState('夜深了，古屋里只有他一人。窗外传来若有若无的脚步声...');
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [generatedVoiceId, setGeneratedVoiceId] = useState<string | null>(null);
-    const [isPlaying, setIsPlaying] = useState(false);
-    
-    // --- Refs ---
-    const audioContextRef = useRef<AudioContext | null>(null);
-    const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
-    const audioBufferRef = useRef<AudioBuffer | null>(null);
-
     // --- Effects ---
     useEffect(() => {
         const saved = localStorage.getItem('tata_custom_voices');
@@ -58,82 +44,11 @@ const VoicePanel: React.FC<VoicePanelProps> = ({ currentVoiceId, onVoiceSelected
         }
     }, []);
 
-    const saveCustomVoice = (voice: Voice) => {
-        const newVoices = [voice, ...customVoices];
-        setCustomVoices(newVoices);
-        localStorage.setItem('tata_custom_voices', JSON.stringify(newVoices));
-    };
-
     const deleteCustomVoice = (id: string, e: React.MouseEvent) => {
         e.stopPropagation();
         const newVoices = customVoices.filter(v => v.id !== id);
         setCustomVoices(newVoices);
         localStorage.setItem('tata_custom_voices', JSON.stringify(newVoices));
-    };
-
-    // --- Handlers ---
-    const handleGenerate = async () => {
-        if (!prompt || !previewText) return;
-        
-        setIsGenerating(true);
-        if (currentSourceRef.current) {
-            currentSourceRef.current.stop();
-            setIsPlaying(false);
-        }
-
-        try {
-            const result = await designVoice(prompt, previewText);
-            if (result) {
-                setGeneratedVoiceId(result.voiceId);
-                
-                // Decode for preview
-                if (!audioContextRef.current) {
-                    audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-                }
-                const ctx = audioContextRef.current;
-                const buffer = await decodeAudioData(result.audio, ctx);
-                audioBufferRef.current = buffer;
-                
-                // Auto play
-                playPreview();
-            }
-        } finally {
-            setIsGenerating(false);
-        }
-    };
-
-    const playPreview = () => {
-        if (!audioBufferRef.current || !audioContextRef.current) return;
-        
-        if (isPlaying && currentSourceRef.current) {
-            currentSourceRef.current.stop();
-            setIsPlaying(false);
-            return;
-        }
-
-        const ctx = audioContextRef.current;
-        if (ctx.state === 'suspended') ctx.resume();
-
-        const source = playAudioBuffer(audioBufferRef.current, ctx, () => {
-            setIsPlaying(false);
-        });
-        currentSourceRef.current = source;
-        setIsPlaying(true);
-    };
-
-    const handleConfirmGeneration = () => {
-        if (generatedVoiceId) {
-            const newVoice: Voice = {
-                id: generatedVoiceId,
-                name: `自定义音色 ${customVoices.length + 1}`,
-                category: 'custom',
-                tags: ['自制']
-            };
-            saveCustomVoice(newVoice);
-            onVoiceSelected(generatedVoiceId);
-            setGeneratedVoiceId(null);
-            setActiveTab('custom');
-        }
     };
 
     const filteredPresetVoices = PRESET_VOICES.filter(v => 
@@ -151,7 +66,7 @@ const VoicePanel: React.FC<VoicePanelProps> = ({ currentVoiceId, onVoiceSelected
                     </div>
                     <div>
                         <h2 className="text-xl font-bold text-[var(--color-text-primary)]">音色工坊</h2>
-                        <p className="text-xs text-[var(--color-text-muted)]">选择或创建专属音色</p>
+                        <p className="text-xs text-[var(--color-text-muted)]">选择专属音色</p>
                     </div>
                 </div>
                 
@@ -167,7 +82,7 @@ const VoicePanel: React.FC<VoicePanelProps> = ({ currentVoiceId, onVoiceSelected
                         onClick={() => setActiveTab('custom')}
                         className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-colors ${activeTab === 'custom' ? 'bg-white text-pink-600' : 'text-[var(--color-text-muted)]'}`}
                     >
-                        自定义
+                        我的收藏
                     </button>
                 </div>
             </div>
@@ -230,9 +145,9 @@ const VoicePanel: React.FC<VoicePanelProps> = ({ currentVoiceId, onVoiceSelected
                 {activeTab === 'custom' && (
                     <div className="space-y-5">
                         {/* Saved Custom Voices */}
-                        {customVoices.length > 0 && (
+                        {customVoices.length > 0 ? (
                              <div className="space-y-2">
-                                <h3 className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide px-1">我的音色库</h3>
+                                <h3 className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide px-1">我的收藏</h3>
                                 {customVoices.map(voice => (
                                     <div 
                                         key={voice.id}
@@ -262,65 +177,15 @@ const VoicePanel: React.FC<VoicePanelProps> = ({ currentVoiceId, onVoiceSelected
                                     </div>
                                 ))}
                             </div>
-                        )}
-
-                        {/* Design Tool */}
-                        <div className="bg-white/60 border border-[var(--color-border-subtle)] rounded-2xl p-4">
-                            <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-4 flex items-center gap-2">
-                                <Wand2 size={16} className="text-purple-500"/> 设计新音色
-                            </h3>
-                            
-                            <div className="space-y-4">
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-medium text-[var(--color-text-muted)]">Prompt 描述</label>
-                                    <textarea 
-                                        className="w-full h-24 p-3 rounded-xl bg-white border border-[var(--color-border-subtle)] focus:border-pink-300 outline-none text-xs resize-none transition-colors"
-                                        placeholder="例如：声音低沉富有磁性的中年男性，语气稳重..."
-                                        value={prompt}
-                                        onChange={(e) => setPrompt(e.target.value)}
-                                    />
+                        ) : (
+                            <div className="text-center py-12">
+                                <div className="w-16 h-16 bg-[var(--color-bg-accent)] rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <Sparkles className="text-[var(--color-text-muted)]" size={24} />
                                 </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-medium text-[var(--color-text-muted)]">试听文本</label>
-                                    <input 
-                                        className="w-full p-3 rounded-xl bg-white border border-[var(--color-border-subtle)] focus:border-pink-300 outline-none text-xs transition-colors"
-                                        value={previewText}
-                                        onChange={(e) => setPreviewText(e.target.value)}
-                                    />
-                                </div>
-
-                                <button 
-                                    onClick={handleGenerate}
-                                    disabled={isGenerating || !prompt}
-                                    className={`w-full py-3 rounded-xl font-semibold text-white transition-colors flex items-center justify-center gap-2 text-sm
-                                        ${isGenerating ? 'bg-gray-400 cursor-not-allowed' : 'bg-[var(--color-text-primary)] hover:opacity-90'}`}
-                                >
-                                    {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                                    {isGenerating ? '正在生成...' : '生成试听'}
-                                </button>
-                            </div>
-
-                            {/* Result Actions */}
-                            {generatedVoiceId && (
-                                <div className="mt-4 pt-4 border-t border-[var(--color-border-subtle)]">
-                                    <div className="flex gap-2">
-                                        <button 
-                                            onClick={playPreview}
-                                            className="flex-1 py-2.5 bg-[var(--color-bg-accent)] hover:bg-[var(--color-bg-hover)] rounded-xl text-[var(--color-text-primary)] font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors"
-                                        >
-                                            {isPlaying ? <Square size={12} fill="currentColor"/> : <Play size={12} fill="currentColor"/>}
-                                            {isPlaying ? '停止' : '播放'}
-                                        </button>
-                                        <button 
-                                            onClick={handleConfirmGeneration}
-                                            className="flex-1 py-2.5 bg-pink-500 hover:bg-pink-600 rounded-xl text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors"
-                                        >
-                                            <Plus size={14} /> 保存并使用
-                                        </button>
-                                    </div>
+                                <p className="text-sm text-[var(--color-text-muted)]">暂无收藏的音色</p>
+                                <p className="text-xs text-[var(--color-text-muted)] mt-1">在内置音色中选择你喜欢的音色吧</p>
                                 </div>
                             )}
-                        </div>
                     </div>
                 )}
             </div>

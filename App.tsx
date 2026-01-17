@@ -1,61 +1,44 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { AssistantState, Message, TodoItem, WeatherData, UserProfile, TarotResult, WaterRecord, CalorieRecord, SleepRecord, ExerciseRecord } from './types';
+import { AssistantState, Message, TodoItem, TodoCategory, WeatherData, TarotResult, WaterRecord, CalorieRecord, SleepRecord, ExerciseRecord } from './types';
 import VideoAvatar, { VideoAvatarRef } from './components/VideoAvatar';
 import ChatInterface from './components/ChatInterface';
-import Onboarding from './components/Onboarding';
+import AuthScreen from './components/AuthScreen';
 import WeatherPanel from './components/tools/WeatherPanel';
 import DivinationPanel from './components/tools/DivinationPanel';
 import HealthPanel from './components/tools/HealthPanel';
 import TodoPanel from './components/tools/TodoPanel';
 import SkillsPanel from './components/tools/SkillsPanel';
-import VoicePanel from './components/tools/VoicePanel';
+// import VoicePanel from './components/tools/VoicePanel'; // 已移除音色选择功能
 import WatchaPanel from './components/tools/WatchaPanel';
-import { generateAssistantResponse, AgentActions, HealthData } from './services/geminiService';
-import { generateSpeech } from './services/minimaxService';
-import { decodeAudioData, playAudioBuffer } from './services/audioService';
-import { getWeatherByLocation, getWeatherByIP } from './services/weatherService';
 import { createCustomConfig } from './config/characterConfig';
-import { CloudSun, Sparkles, Notebook, Zap, Settings, X, Bell, Clock, Mic2, Activity, CheckSquare, Calendar, Image, Phone, Globe, ChevronUp, ChevronDown } from 'lucide-react';
-
-// 塔罗牌数据库
-const TAROT_CARDS = [
-  { name: '愚者', upright: '新的开始、冒险、纯真', reversed: '鲁莽、冒险过度' },
-  { name: '魔术师', upright: '创造力、技能、意志力', reversed: '欺骗、能力不足' },
-  { name: '女祭司', upright: '直觉、神秘、内在智慧', reversed: '隐藏的信息、不信任直觉' },
-  { name: '皇后', upright: '丰盛、母性、创造', reversed: '依赖、创造力受阻' },
-  { name: '皇帝', upright: '权威、结构、领导力', reversed: '专制、缺乏纪律' },
-  { name: '教皇', upright: '传统、指导、信仰', reversed: '打破常规、个人信念' },
-  { name: '恋人', upright: '爱情、和谐、选择', reversed: '不和谐、价值观冲突' },
-  { name: '战车', upright: '胜利、决心、控制', reversed: '缺乏方向、失控' },
-  { name: '力量', upright: '勇气、内在力量、耐心', reversed: '自我怀疑、软弱' },
-  { name: '隐士', upright: '内省、寻求、指引', reversed: '孤立、逃避' },
-  { name: '命运之轮', upright: '好运、命运、转折点', reversed: '厄运、抗拒改变' },
-  { name: '正义', upright: '公平、真相、因果', reversed: '不公、逃避责任' },
-  { name: '倒吊人', upright: '牺牲、新视角、等待', reversed: '拖延、无谓牺牲' },
-  { name: '死神', upright: '结束、转变、新生', reversed: '抗拒改变、停滞' },
-  { name: '节制', upright: '平衡、耐心、目的', reversed: '失衡、过度' },
-  { name: '恶魔', upright: '束缚、物质主义、诱惑', reversed: '解脱、恢复控制' },
-  { name: '塔', upright: '突变、启示、觉醒', reversed: '逃避灾难、恐惧改变' },
-  { name: '星星', upright: '希望、灵感、宁静', reversed: '失望、缺乏信心' },
-  { name: '月亮', upright: '直觉、潜意识、幻象', reversed: '困惑消散、面对恐惧' },
-  { name: '太阳', upright: '快乐、成功、活力', reversed: '暂时挫折、缺乏热情' },
-  { name: '审判', upright: '觉醒、重生、内在召唤', reversed: '自我怀疑、逃避召唤' },
-  { name: '世界', upright: '完成、整合、成就', reversed: '不完整、缺乏closure' },
-];
+import { api, authApi, chatApi, categoryApi, healthApi, todoApi, weatherApi, ttsApi } from './services/api';
+import { decodeAudioData, playAudioBuffer } from './services/audioService';
+import { CloudSun, Sparkles, Mic2, Activity, CheckSquare, Zap, ChevronUp, ChevronDown, LogOut } from 'lucide-react';
 
 // Panel Types - 统一管理，所有面板都在右侧显示
-type ActivePanelType = 'none' | 'weather' | 'fortune' | 'health' | 'todo' | 'skills' | 'voice' | 'watcha';
+type ActivePanelType = 'none' | 'weather' | 'fortune' | 'health' | 'todo' | 'skills' | 'watcha';
+
+// 用户信息类型
+interface UserProfile {
+  id: string;
+  username: string;
+  name: string;
+  gender?: string;
+  identity?: string;
+  expectations?: string;
+}
 
 const App: React.FC = () => {
-  // --- State ---
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  // --- 认证状态 ---
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   
   // Panel States - 统一管理
   const [activePanel, setActivePanel] = useState<ActivePanelType>('none');
   
-  // Voice State
-  const [currentVoiceId, setCurrentVoiceId] = useState<string>('female-shaonv');
+  // Voice State - 固定使用 Korean_ThoughtfulWoman
+  const currentVoiceId = 'Korean_ThoughtfulWoman';
   
   // Micro-interaction State
   const [hasNewTodo, setHasNewTodo] = useState(false);
@@ -68,9 +51,8 @@ const App: React.FC = () => {
   const [latestResponse, setLatestResponse] = useState<string | null>(null);
   
   // Data States
-  const [todos, setTodos] = useState<TodoItem[]>([
-    { id: '1', text: '跟叉叉打个招呼', completed: false, priority: 'high', category: 'work' },
-  ]);
+  const [categories, setCategories] = useState<TodoCategory[]>([]);
+  const [todos, setTodos] = useState<TodoItem[]>([]);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [isListening, setIsListening] = useState(false);
   
@@ -81,10 +63,10 @@ const App: React.FC = () => {
       sleep: SleepRecord;
       exercise: ExerciseRecord;
   }>({
-      water: { current: 1200, goal: 2000, history: [] },
-      calories: { current: 1450, goal: 2200, macros: { protein: 90, carbs: 180, fat: 55 }, history: [] },
-      sleep: { current: 7.5, goal: 8, history: [{day: 'Mon', hours: 7}, {day: 'Tue', hours: 6.5}, {day: 'Wed', hours: 8}, {day: 'Thu', hours: 7.5}] },
-      exercise: { current: 45, goal: 60, history: [{day: 'Mon', minutes: 30}, {day: 'Tue', minutes: 60}, {day: 'Wed', minutes: 45}, {day: 'Thu', minutes: 45}] }
+      water: { current: 0, goal: 2000, history: [] },
+      calories: { current: 0, goal: 2200, macros: { protein: 0, carbs: 0, fat: 0 }, history: [] },
+      sleep: { current: 0, goal: 8, history: [] },
+      exercise: { current: 0, goal: 60, history: [] }
   });
 
   // Mock Data
@@ -94,8 +76,68 @@ const App: React.FC = () => {
   const recognitionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const weatherFetchedRef = useRef<boolean>(false); // 防止重复请求天气数据
-  const videoAvatarRef = useRef<VideoAvatarRef>(null); // 视频人物状态机引用
+  const weatherFetchedRef = useRef<boolean>(false);
+  const videoAvatarRef = useRef<VideoAvatarRef>(null);
+
+  // --- 检查认证状态 ---
+  useEffect(() => {
+    const checkAuth = async () => {
+      if (authApi.isAuthenticated()) {
+        const storedUser = authApi.getStoredUser();
+        if (storedUser) {
+          setUser(storedUser);
+          // 加载用户数据
+          loadUserData();
+        } else {
+          // Token 存在但没有用户信息，尝试获取
+          const result = await authApi.getProfile();
+          if (result.success && result.data) {
+            setUser(result.data);
+            loadUserData();
+          }
+        }
+      }
+      setAuthChecked(true);
+    };
+    checkAuth();
+
+    // 监听未授权事件
+    const handleUnauthorized = () => {
+      setUser(null);
+    };
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+  }, []);
+
+  // --- 加载用户数据 ---
+  const loadUserData = async () => {
+    // 加载分类
+    const categoriesResult = await categoryApi.getList();
+    if (categoriesResult.success && categoriesResult.data) {
+      setCategories(categoriesResult.data);
+    }
+
+    // 加载待办（包括已完成的）
+    const todosResult = await todoApi.getList(true);
+    if (todosResult.success && todosResult.data) {
+      setTodos(todosResult.data);
+    }
+
+    // 加载健康数据
+    const healthResult = await healthApi.getSummary();
+    if (healthResult.success && healthResult.data) {
+      setHealthData({
+        water: healthResult.data.water,
+        calories: {
+          ...healthResult.data.calories,
+          // 确保 macros 字段存在，后端暂时没有提供这个数据
+          macros: healthResult.data.calories.macros || { protein: 0, carbs: 0, fat: 0 }
+        },
+        sleep: healthResult.data.sleep,
+        exercise: healthResult.data.exercise
+      });
+    }
+  };
 
   // --- Helpers ---
   const addMessage = (role: 'user' | 'assistant', content: string) => {
@@ -112,8 +154,8 @@ const App: React.FC = () => {
 
   const speak = async (text: string) => {
     try {
-      // Pass the currentVoiceId to the service
-      const audioBufferData = await generateSpeech(text, currentVoiceId);
+      // 使用后端 TTS API
+      const audioBufferData = await ttsApi.synthesize(text, currentVoiceId);
       
       if (audioBufferData) {
         if (!audioContextRef.current) {
@@ -127,209 +169,135 @@ const App: React.FC = () => {
             setState(AssistantState.IDLE);
         });
       } else {
-        // Fallback
+        // Fallback to browser TTS
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'zh-CN'; 
         utterance.onend = () => setState(AssistantState.IDLE);
         window.speechSynthesis.speak(utterance);
       }
     } catch (e) {
+      console.error('[TTS] Error:', e);
       setState(AssistantState.IDLE);
     }
   };
 
-  // 生成塔罗牌占卜结果
-  const generateTarotReading = (question: string): TarotResult => {
-    // 随机抽取3张牌
-    const shuffled = [...TAROT_CARDS].sort(() => Math.random() - 0.5);
-    const drawnCards = shuffled.slice(0, 3).map((card, index) => {
-      const isReversed = Math.random() > 0.6;
-      const positions = ['过去', '现在', '未来'];
-      return {
-        name: card.name,
-        position: positions[index],
-        meaning: isReversed ? card.reversed : card.upright,
-        orientation: (isReversed ? 'reversed' : 'upright') as 'upright' | 'reversed'
-      };
-    });
-
-    // 生成分析
-    const analysis = `关于「${question}」的占卜显示：
-${drawnCards[0].name}代表你的过去，暗示${drawnCards[0].meaning}；
-${drawnCards[1].name}象征当下的状态，意味着${drawnCards[1].meaning}；
-${drawnCards[2].name}指向未来的可能，预示${drawnCards[2].meaning}。`;
-
-    const advice = drawnCards[2].orientation === 'upright' 
-      ? '整体来看运势不错，继续保持积极的心态吧！'
-      : '可能会遇到一些挑战，但这也是成长的机会哦~';
-
-    return {
-      type: 'tarot',
-      cards: drawnCards,
-      analysis,
-      advice
-    };
-  };
-
+  // --- 发送消息到后端 ---
   const processInput = async (text: string) => {
     addMessage('user', text);
     setState(AssistantState.THINKING);
 
-    // 完整的 Agent Actions
-    const actions: AgentActions = {
-      // --- 待办事项 ---
-      onAddTodo: (todoText: string, priority?: string, category?: string) => {
-        setTodos(prev => {
-          setHasNewTodo(true);
-          setTimeout(() => setHasNewTodo(false), 2000);
-          return [...prev, { 
-            id: Date.now().toString(), 
-            text: todoText, 
-            completed: false, 
-            priority: (priority as 'high' | 'medium' | 'low') || 'medium',
-            category: category as 'health' | 'work' | 'dev' | 'content' | undefined
-          }];
-        });
-        setActivePanel('todo');
-      },
+    try {
+      const result = await chatApi.sendMessage(text);
       
-      onToggleTodo: (searchText: string): boolean => {
-        let found = false;
-        setTodos(prev => prev.map(t => {
-          if (t.text.includes(searchText)) {
-            found = true;
-            return { ...t, completed: !t.completed };
-          }
-          return t;
-        }));
-        if (found) setActivePanel('todo');
-        return found;
-      },
-      
-      onDeleteTodo: (searchText: string): boolean => {
-        let found = false;
-        setTodos(prev => {
-          const newTodos = prev.filter(t => {
-            if (t.text.includes(searchText)) {
-              found = true;
-              return false;
-            }
-            return true;
-          });
-          return newTodos;
-        });
-        return found;
-      },
-
-      // --- 天气 ---
-      onSetWeather: (data: WeatherData) => {
-        setWeather(data);
-        setActivePanel('weather');
-      },
-
-      // --- 健康追踪 ---
-      onAddWater: (amount?: number) => {
-        const addAmount = amount || 250;
+      if (result.success && result.data) {
+        const { content, actions } = result.data;
+        
+        // 处理后端返回的动作
+        for (const action of actions) {
+          switch (action.type) {
+            case 'openPanel':
+              setActivePanel(action.data as ActivePanelType);
+              break;
+            case 'setWeather':
+              setWeather(action.data);
+              setActivePanel('weather');
+              break;
+            case 'setTarot':
+              setTarot(action.data);
+              setActivePanel('fortune');
+              break;
+            case 'updateHealth':
+              if (action.data.water) {
         setHealthData(prev => ({
           ...prev,
-          water: { 
-            ...prev.water, 
-            current: prev.water.current + addAmount,
-            history: [...prev.water.history, { 
-              time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }), 
-              amount: addAmount, 
-              type: '水' 
-            }]
+                  water: { ...prev.water, current: action.data.water.current }
+                }));
+              }
+              break;
           }
-        }));
-        setActivePanel('health');
-      },
-      
-      onGetHealthStatus: (): HealthData => {
-        return healthData;
-      },
+        }
 
-      // --- 占卜 ---
-      onDrawTarot: (question?: string): TarotResult => {
-        const result = generateTarotReading(question || '今日运势');
-        setTarot(result);
-        setActivePanel('fortune');
-        return result;
-      },
+        // 如果有待办相关操作，刷新待办列表
+        if (actions.some(a => a.type === 'openPanel' && a.data === 'todo')) {
+          const todosResult = await todoApi.getList(true);
+          if (todosResult.success && todosResult.data) {
+            setTodos(todosResult.data);
+            setHasNewTodo(true);
+            setTimeout(() => setHasNewTodo(false), 2000);
+          }
+        }
 
-      // --- 面板控制 ---
-      onOpenPanel: (panel: string) => {
-        setActivePanel(panel as ActivePanelType);
+        addMessage('assistant', content);
+        setState(AssistantState.SPEAKING);
+        await speak(content);
+      } else {
+        const errorMsg = result.error || '抱歉，时间线出了点小波动~';
+        addMessage('assistant', errorMsg);
+        setState(AssistantState.IDLE);
       }
-    };
-
-    const responseText = await generateAssistantResponse(
-      messages, 
-      text, 
-      { 
-        todos, 
-        weather,
-        healthData,
-        userName: userProfile?.name
-      },
-      actions
-    );
-
-    addMessage('assistant', responseText);
-    setState(AssistantState.SPEAKING);
-    await speak(responseText);
+    } catch (error) {
+      console.error('[Chat] Error:', error);
+      addMessage('assistant', '网络连接不稳定，请稍后再试~');
+      setState(AssistantState.IDLE);
+    }
   };
 
-  const handleVoiceSelected = (voiceId: string) => {
-      setCurrentVoiceId(voiceId);
-      // Give simple feedback
-      speak("你喜欢这个新声音吗？");
-      setState(AssistantState.SPEAKING);
-  };
+  // 已移除音色选择功能
 
-  const handleAddWater = () => {
+  const handleAddWater = async () => {
+    const result = await healthApi.addWater(250);
+    if (result.success && result.data) {
       setHealthData(prev => ({
           ...prev,
-          water: { ...prev.water, current: prev.water.current + 250 }
+        water: { ...prev.water, current: result.data.current }
       }));
       speak("咕嘟咕嘟，补充水分啦！");
       setState(AssistantState.SPEAKING);
+    }
   };
 
-  // --- Setup ---
-  useEffect(() => {
-     const saved = localStorage.getItem('chacha_profile');
-     if (saved) setUserProfile(JSON.parse(saved));
+  const handleLogout = () => {
+    authApi.logout();
+    setUser(null);
+    setMessages([]);
+    setTodos([]);
+  };
 
-     // 防止 React StrictMode 双重调用导致的重复请求
-     if (weatherFetchedRef.current) return;
+  // --- 获取天气 ---
+  useEffect(() => {
+    if (!user || weatherFetchedRef.current) return;
      weatherFetchedRef.current = true;
 
      const fetchWeather = async () => {
-         // 优先使用浏览器精确定位（避免 IP API 限流）
+      // 尝试使用浏览器定位
          if (navigator.geolocation) {
              navigator.geolocation.getCurrentPosition(
                  async (position) => {
                      const { latitude, longitude } = position.coords;
-                     const w = await getWeatherByLocation(latitude, longitude);
-                     if (w) setWeather(w);
+            const result = await weatherApi.getByLocation(latitude, longitude);
+            if (result.success && result.data) {
+              setWeather(result.data);
+            }
                  }, 
-                 async (err) => {
-                     console.warn("Geolocation permission denied, trying IP-based location", err);
-                     // 仅在地理定位失败时才使用 IP API（降低请求频率）
-                     const ipWeatherData = await getWeatherByIP();
-                     if (ipWeatherData) setWeather(ipWeatherData);
+          async () => {
+            // 定位失败，使用自动获取
+            const result = await weatherApi.getAuto();
+            if (result.success && result.data) {
+              setWeather(result.data);
+            }
                  }
              );
          } else {
-             // 浏览器不支持地理定位时才使用 IP API
-             const ipWeatherData = await getWeatherByIP();
-             if (ipWeatherData) setWeather(ipWeatherData);
+        const result = await weatherApi.getAuto();
+        if (result.success && result.data) {
+          setWeather(result.data);
+        }
          }
      };
      fetchWeather();
-  }, []);
+  }, [user]);
 
+  // --- 语音识别设置 ---
   useEffect(() => {
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -351,15 +319,7 @@ ${drawnCards[2].name}指向未来的可能，预示${drawnCards[2].meaning}。`;
     else recognitionRef.current?.start();
   }, [isListening]);
 
-  const handleOnboardingComplete = (profile: UserProfile) => {
-      setUserProfile(profile);
-      localStorage.setItem('chacha_profile', JSON.stringify(profile));
-      const intro = `嗨！${profile.name}，很高兴遇见你！我是叉叉，来自2045年的你亲手创造的AI助手～让我们一起把生活整理得井井有条吧！`;
-      addMessage('assistant', intro);
-      speak(intro);
-  };
-
-  // 缓存视频人物配置（避免每次渲染都重新创建）
+  // 缓存视频人物配置
   const characterConfig = useMemo(() => createCustomConfig(), []);
 
   // --- 监听屏幕大小变化 ---
@@ -374,11 +334,10 @@ ${drawnCards[2].name}指向未来的可能，预示${drawnCards[2].meaning}。`;
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
-  // --- 面板联动逻辑：根据面板状态控制视频人物朝向 ---
+  // --- 面板联动逻辑 ---
   useEffect(() => {
     if (!videoAvatarRef.current) return;
 
-    // 激活面板时朝右看，否则朝中间
     if (activePanel !== 'none') {
       videoAvatarRef.current.focusRight();
     } else {
@@ -386,7 +345,7 @@ ${drawnCards[2].name}指向未来的可能，预示${drawnCards[2].meaning}。`;
     }
   }, [activePanel]);
 
-  // --- 语音状态联动：说话时播放对应动作 ---
+  // --- 语音状态联动 ---
   useEffect(() => {
     if (!videoAvatarRef.current) return;
 
@@ -397,7 +356,29 @@ ${drawnCards[2].name}指向未来的可能，预示${drawnCards[2].meaning}。`;
     }
   }, [state]);
 
-  if (!userProfile) return <Onboarding onComplete={handleOnboardingComplete} />;
+  // --- 登录成功回调 ---
+  const handleAuthSuccess = (userData: UserProfile) => {
+    setUser(userData);
+    loadUserData();
+    // 欢迎消息
+    const intro = `嗨！${userData.name}，很高兴遇见你！我是叉叉，来自2045年的你亲手创造的AI助手～让我们一起把生活整理得井井有条吧！`;
+    addMessage('assistant', intro);
+    speak(intro);
+  };
+
+  // --- 等待认证检查完成 ---
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen bg-[#fdfcf8] flex items-center justify-center">
+        <div className="animate-pulse text-[#8b7b6d]">加载中...</div>
+      </div>
+    );
+  }
+
+  // --- 未登录显示登录页面 ---
+  if (!user) {
+    return <AuthScreen onAuthSuccess={handleAuthSuccess} />;
+  }
 
   // 判断是否有面板打开
   const hasPanelOpen = activePanel !== 'none';
@@ -414,13 +395,27 @@ ${drawnCards[2].name}指向未来的可能，预示${drawnCards[2].meaning}。`;
             backgroundRepeat: 'no-repeat'
           }}
         ></div>
-        {/* Subtle overlay for readability */}
+        {/* Subtle overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#fdfcf8]/30 pointer-events-none"></div>
 
-        {/* === 主布局容器 - 使用 Flex 铺满整个屏幕 === */}
+        {/* 用户信息和登出按钮 */}
+        <div className="absolute top-4 right-4 z-50 flex items-center gap-3">
+          <span className="text-sm text-[#8b7b6d]">
+            你好，{user.name}
+          </span>
+          <button
+            onClick={handleLogout}
+            className="p-2 rounded-full bg-white/60 hover:bg-white/80 transition-all"
+            title="登出"
+          >
+            <LogOut size={18} className="text-[#8b7b6d]" />
+          </button>
+        </div>
+
+        {/* === 主布局容器 === */}
         <div className="relative h-full w-full flex">
           
-          {/* --- 左侧工具栏区域 (固定宽度) --- */}
+          {/* --- 左侧工具栏区域 --- */}
           <div className="flex-shrink-0 flex items-center justify-center z-30 w-16 sm:w-20 md:w-24 transition-all duration-500">
             <ScrollableToolbar 
               activePanel={activePanel} 
@@ -436,17 +431,17 @@ ${drawnCards[2].name}指向未来的可能，预示${drawnCards[2].meaning}。`;
             transition-all duration-500 ease-out
             ${hasPanelOpen ? 'flex-[0.55] min-w-0' : 'flex-1'}
           `}>
-            {/* Speech Bubble Area */}
+            {/* Speech Bubble */}
             <div className="w-full max-w-sm md:max-w-md lg:max-w-lg h-20 md:h-28 flex items-end justify-center mb-2 px-4 pointer-events-none">
-              {state === AssistantState.SPEAKING && latestResponse && (
+                {state === AssistantState.SPEAKING && latestResponse && (
                 <div className="bg-white/90 backdrop-blur-md border border-purple-100 px-4 md:px-6 py-3 md:py-4 rounded-2xl md:rounded-3xl rounded-bl-none shadow-xl text-xs sm:text-sm md:text-base font-medium text-gray-700 animate-fade-in-up relative max-w-full text-center">
-                  {latestResponse}
+                        {latestResponse}
                   <div className="absolute -bottom-2 left-4 md:left-6 w-3 md:w-4 h-3 md:h-4 bg-white/90 border-b border-r border-purple-100 transform rotate-45"></div>
-                </div>
-              )}
-            </div>
+                    </div>
+                )}
+             </div>
 
-            {/* Character - 视频状态机驱动的人物 - 响应式缩放 */}
+            {/* Character */}
             <div 
               className={`
                 w-full flex items-center justify-center relative pointer-events-auto 
@@ -456,26 +451,25 @@ ${drawnCards[2].name}指向未来的可能，预示${drawnCards[2].meaning}。`;
                 ${hasPanelOpen ? 'max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg' : 'max-w-sm md:max-w-md lg:max-w-lg'}
               `}
               style={{
-                // 小设备放大 25%，大设备放大 15%
                 transform: hasPanelOpen 
                   ? (isSmallScreen ? 'scale(1.375)' : 'scale(1.265)') 
                   : (isSmallScreen ? 'scale(1.25)' : 'scale(1.15)'),
                 transformOrigin: 'center bottom'
               }}
             >
-              <VideoAvatar 
-                ref={videoAvatarRef}
-                config={characterConfig}
-                className="h-full w-full"
-                autoPlay={true}
-                debug={true}
-                onStateChange={(event) => {
-                  console.log('[App] Character state:', event.currentState, 'previous:', event.previousState);
-                }}
-              />
-            </div>
+                  <VideoAvatar 
+                    ref={videoAvatarRef}
+                    config={characterConfig}
+                    className="h-full w-full"
+                    autoPlay={true}
+                debug={false}
+                    onStateChange={(event) => {
+                  console.log('[App] Character state:', event.currentState);
+                    }}
+                  />
+        </div>
 
-            {/* Bottom Chat Interface - 让它占用尽可能多的可用宽度 */}
+            {/* Chat Interface */}
             <div className={`
               w-full mt-auto px-3 md:px-4 pb-4 md:pb-6
               ${hasPanelOpen ? 'max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl' : 'max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl'}
@@ -488,9 +482,9 @@ ${drawnCards[2].name}指向未来的可能，预示${drawnCards[2].meaning}。`;
                 inputRef={inputRef}
               />
             </div>
-          </div>
+            </div>
 
-          {/* --- 右侧面板区域 (动态宽度，铺满剩余空间) --- */}
+          {/* --- 右侧面板区域 --- */}
           <div className={`
             flex items-center justify-start z-30 pr-3 sm:pr-4 md:pr-6
             transition-all duration-500 ease-out overflow-hidden
@@ -503,35 +497,51 @@ ${drawnCards[2].name}指向未来的可能，预示${drawnCards[2].meaning}。`;
               <div className="w-full h-[88vh] max-h-[750px] animate-slide-in-right">
                 <div className="h-full rounded-2xl sm:rounded-3xl lg:rounded-[2rem] overflow-hidden glass-panel-strong border border-white/50">
                   {activePanel === 'weather' && (
-                    weather ? <WeatherPanel weather={weather} /> 
-                    : <div className="p-8 text-center text-gray-500 flex flex-col items-center justify-center h-full gap-2">
-                        <Clock className="animate-spin text-gray-300"/>
-                        <span>正在校准时间线...</span>
-                      </div>
-                  )}
+                             weather ? <WeatherPanel weather={weather} /> 
+                             : <div className="p-8 text-center text-gray-500 flex flex-col items-center justify-center h-full gap-2">
+                                 <span>正在校准时间线...</span>
+                               </div>
+                        )}
                   {activePanel === 'health' && (
-                    <HealthPanel 
-                      {...healthData}
-                      onAddWater={handleAddWater}
-                    />
-                  )}
+                            <HealthPanel 
+                                {...healthData}
+                                onAddWater={handleAddWater}
+                            />
+                        )}
                   {activePanel === 'fortune' && <DivinationPanel result={tarot} />}
                   {activePanel === 'todo' && (
                     <TodoPanel 
+                      categories={categories}
                       todos={todos} 
-                      onToggle={(id) => setTodos(prev => prev.map(t => t.id === id ? {...t, completed: !t.completed} : t))} 
-                    />
-                  )}
+                      onToggle={async (id) => {
+                        await todoApi.toggle(id);
+                        const result = await todoApi.getList(true); // 获取包括已完成的
+                        if (result.success && result.data) {
+                          setTodos(result.data);
+                        }
+                    }}
+                      onAddTodo={async (todo) => {
+                        const result = await todoApi.create(todo);
+                        if (result.success) {
+                          const listResult = await todoApi.getList(true);
+                          if (listResult.success && listResult.data) {
+                            setTodos(listResult.data);
+                          }
+                        }
+                      }}
+                      onDelete={async (id) => {
+                        await todoApi.delete(id);
+                        const result = await todoApi.getList(true);
+                        if (result.success && result.data) {
+                          setTodos(result.data);
+                        }
+                      }}
+                            />
+                        )}
                   {activePanel === 'skills' && <SkillsPanel />}
-                  {activePanel === 'voice' && (
-                    <VoicePanel 
-                      currentVoiceId={currentVoiceId}
-                      onVoiceSelected={handleVoiceSelected} 
-                    />
-                  )}
                   {activePanel === 'watcha' && <WatchaPanel />}
+                    </div>
                 </div>
-              </div>
             )}
           </div>
         </div>
@@ -539,7 +549,7 @@ ${drawnCards[2].name}指向未来的可能，预示${drawnCards[2].meaning}。`;
   );
 };
 
-// Scrollable Toolbar Component with fade indicators
+// Scrollable Toolbar Component
 const ScrollableToolbar = ({ 
   activePanel, 
   setActivePanel, 
@@ -556,7 +566,6 @@ const ScrollableToolbar = ({
   const [showTopFade, setShowTopFade] = useState(false);
   const [showBottomFade, setShowBottomFade] = useState(false);
 
-  // Check scroll position
   const checkScroll = useCallback(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
@@ -570,15 +579,11 @@ const ScrollableToolbar = ({
     const container = scrollContainerRef.current;
     if (!container) return;
     
-    // Initial check
     checkScroll();
-    
-    // Listen to scroll events
     container.addEventListener('scroll', checkScroll);
     return () => container.removeEventListener('scroll', checkScroll);
   }, [checkScroll]);
 
-  // 自动滚动到激活的工具按钮（当 Agent 调用时）
   useEffect(() => {
     if (activePanel === 'none') return;
     
@@ -589,19 +594,16 @@ const ScrollableToolbar = ({
       const containerRect = container.getBoundingClientRect();
       const toolRect = toolElement.getBoundingClientRect();
       
-      // 检查元素是否在可视区域内
       const isAbove = toolRect.top < containerRect.top;
       const isBelow = toolRect.bottom > containerRect.bottom;
       
       if (isAbove || isBelow) {
-        // 平滑滚动到元素位置，让元素居中显示
         const scrollTarget = toolElement.offsetTop - container.clientHeight / 2 + toolElement.clientHeight / 2;
         container.scrollTo({ top: scrollTarget, behavior: 'smooth' });
       }
     }
   }, [activePanel]);
 
-  // Scroll handlers
   const scrollUp = () => {
     scrollContainerRef.current?.scrollBy({ top: -100, behavior: 'smooth' });
   };
@@ -614,11 +616,8 @@ const ScrollableToolbar = ({
     const newState = activePanel === panel ? 'none' : panel;
     setActivePanel(newState);
     
-    // 打开待办面板时播放动作
     if (panel === 'todo' && newState === 'todo') {
-      if (videoAvatarRef.current) {
-        videoAvatarRef.current.playAction('wave');
-      }
+      videoAvatarRef.current?.playAction('wave');
     }
   };
 
@@ -628,7 +627,6 @@ const ScrollableToolbar = ({
     { id: 'fortune' as const, icon: <Sparkles size={22} />, label: '占卜' },
     { id: 'todo' as const, icon: <CheckSquare size={22} />, label: '待办', notification: hasNewTodo },
     { id: 'skills' as const, icon: <Zap size={22} />, label: '技能' },
-    { id: 'voice' as const, icon: <Mic2 size={22} />, label: '声音' },
     { id: 'watcha' as const, icon: <img src="/watcha.svg" alt="Watcha" className="w-5 h-5" style={{ filter: activePanel === 'watcha' ? 'none' : 'opacity(0.6)' }} />, label: 'Watcha' },
   ];
 
@@ -649,7 +647,7 @@ const ScrollableToolbar = ({
         </button>
       </div>
 
-      {/* Scrollable Tools Container - 响应式高度和间距 */}
+      {/* Scrollable Tools Container */}
       <div 
         ref={scrollContainerRef}
         className="flex flex-col gap-1 sm:gap-2 flex-1 overflow-y-auto no-scrollbar py-1"
@@ -668,8 +666,8 @@ const ScrollableToolbar = ({
             />
           </div>
         ))}
-      </div>
-
+        </div>
+        
       {/* Bottom Scroll Button */}
       <div 
         className={`flex-shrink-0 mt-1 sm:mt-2 transition-all duration-300 ${
@@ -688,7 +686,7 @@ const ScrollableToolbar = ({
   );
 };
 
-// Helper Component for Toolbar Icons - 响应式设计
+// Toolbar Icon Component
 const ToolbarIcon = ({ icon, active, onClick, label, notification }: { 
   icon: React.ReactNode, 
   active: boolean, 
@@ -708,40 +706,18 @@ const ToolbarIcon = ({ icon, active, onClick, label, notification }: {
             `}
         >
             <span className="scale-75 sm:scale-90 md:scale-100">
-              {icon}
+            {icon}
             </span>
             {notification && (
                 <span className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-rose-500 rounded-full border-2 border-[#f5f0e8] shadow-sm animate-pulse"></span>
             )}
         </button>
-        {/* Label below icon - 响应式字体 */}
         <span className={`
           toolbar-label mt-0.5 sm:mt-1 font-medium transition-colors
           text-[10px] sm:text-xs
           ${active ? 'text-[#5c4d43]' : 'text-[#a89b8c]'}
         `}>
             {label}
-        </span>
-    </div>
-);
-
-// Legacy GlassIcon (kept for compatibility)
-const GlassIcon = ({ icon, active, onClick, label, notification }: { icon: React.ReactNode, active: boolean, onClick: () => void, label: string, notification?: boolean }) => (
-    <div className="relative group">
-        <button 
-            onClick={onClick}
-            className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 glass-icon ${active ? '!bg-white/90 !shadow-lg text-purple-600 scale-105' : 'text-gray-600'} ${notification ? 'animate-shake' : ''}`}
-        >
-            {icon}
-            {notification && (
-                <span className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-white shadow-sm"></span>
-            )}
-        </button>
-        {/* Tooltip Label */}
-        <span className="absolute left-full top-1/2 -translate-y-1/2 ml-4 px-3 py-1.5 bg-gray-800/90 backdrop-blur text-white text-xs font-bold rounded-lg opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0 whitespace-nowrap pointer-events-none shadow-xl">
-            {label}
-            {/* Little arrow pointing left */}
-            <span className="absolute right-full top-1/2 -translate-y-1/2 -mr-1 border-4 border-transparent border-r-gray-800/90"></span>
         </span>
     </div>
 );
