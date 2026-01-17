@@ -13,12 +13,14 @@ interface AffinityIndicatorProps {
   affinity: AffinityData;
   showDetails?: boolean;
   compact?: boolean;
+  variant?: 'default' | 'toolbar';
 }
 
 const AffinityIndicator: React.FC<AffinityIndicatorProps> = ({ 
   affinity, 
   showDetails = false,
-  compact = false 
+  compact = false,
+  variant = 'default'
 }) => {
   // 确保affinity数据有效
   if (!affinity) {
@@ -39,6 +41,20 @@ const AffinityIndicator: React.FC<AffinityIndicatorProps> = ({
       return 'text-rose-500';
     } catch {
       return 'text-gray-400';
+    }
+  };
+
+  const getLevelFillColor = (level: AffinityLevel): string => {
+    try {
+      const levelNum = parseInt(level.replace('v', ''));
+      if (isNaN(levelNum)) return '#9ca3af'; // gray-400
+      if (levelNum <= 2) return '#9ca3af'; // gray-400
+      if (levelNum <= 4) return '#3b82f6'; // blue-500
+      if (levelNum <= 6) return '#f59e0b'; // amber-500
+      if (levelNum <= 8) return '#f97316'; // orange-500
+      return '#f43f5e'; // rose-500
+    } catch {
+      return '#9ca3af';
     }
   };
   
@@ -63,6 +79,43 @@ const AffinityIndicator: React.FC<AffinityIndicatorProps> = ({
     heartCount = 1;
   }
   
+  // 渲染工具栏变体：一个会随好感度垂直填充的爱心
+  if (variant === 'toolbar') {
+    const fillColor = getLevelFillColor(stats.level);
+    // 整体好感度百分比 (0-1000 -> 0-100%)
+    const totalProgress = (affinity.value / 1000) * 100;
+    
+    return (
+      <div className="relative w-7 h-7 flex items-center justify-center">
+        {/* 底层空心心 */}
+        <Heart 
+          size={24} 
+          className="text-gray-200 transition-colors duration-500" 
+        />
+        {/* 上层填充心 - 使用 clip-path 实现垂直填充效果 */}
+        <div 
+          className="absolute inset-0 flex items-center justify-center overflow-hidden transition-all duration-700 ease-in-out"
+          style={{ 
+            clipPath: `inset(${100 - totalProgress}% 0 0 0)`
+          }}
+        >
+          <Heart 
+            size={24} 
+            fill={fillColor}
+            color={fillColor}
+            className="transition-colors duration-500"
+          />
+        </div>
+        {/* 悬浮显示的数值或小圆点提示 */}
+        <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-white rounded-full border border-gray-100 flex items-center justify-center shadow-sm">
+          <span className="text-[8px] font-bold text-gray-500" style={{ fontSize: '7px', lineHeight: 1 }}>
+            {stats.level.replace('v', '')}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   if (compact) {
     return (
       <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/60 backdrop-blur-sm">

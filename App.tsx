@@ -502,6 +502,7 @@ const App: React.FC = () => {
               setActivePanel={setActivePanel} 
               hasNewTodo={hasNewTodo} 
               videoAvatarRef={videoAvatarRef} 
+              affinity={affinity}
             />
           </div>
 
@@ -520,15 +521,6 @@ const App: React.FC = () => {
                     </div>
                 )}
              </div>
-
-            {/* 好感度指示器 - 在角色上方右侧 */}
-            <div 
-              className="absolute top-4 md:top-6 right-4 md:right-6 z-20 pointer-events-auto cursor-pointer hover:scale-105 transition-transform"
-              onClick={() => setActivePanel(activePanel === 'affinity' ? 'none' : 'affinity')}
-              title="点击查看好感度详情"
-            >
-              <AffinityIndicator affinity={affinity} compact={true} />
-            </div>
 
             {/* Character - 视频状态机驱动的人物 - 响应式缩放 */}
             <div 
@@ -687,12 +679,14 @@ const ScrollableToolbar = ({
   activePanel, 
   setActivePanel, 
   hasNewTodo,
-  videoAvatarRef 
+  videoAvatarRef,
+  affinity
 }: { 
   activePanel: ActivePanelType;
   setActivePanel: (panel: ActivePanelType) => void;
   hasNewTodo: boolean;
   videoAvatarRef: React.RefObject<VideoAvatarRef | null>;
+  affinity: AffinityData;
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const toolRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -760,6 +754,7 @@ const ScrollableToolbar = ({
     { id: 'fortune' as const, icon: <Sparkles size={22} />, label: '占卜' },
     { id: 'todo' as const, icon: <CheckSquare size={22} />, label: '待办', notification: hasNewTodo },
     { id: 'skills' as const, icon: <Zap size={22} />, label: '技能' },
+    { id: 'affinity' as const, icon: <AffinityIndicator variant="toolbar" affinity={affinity} />, label: '好感度' },
     { id: 'watcha' as const, icon: <img src="/watcha.svg" alt="Watcha" className="w-5 h-5" style={{ filter: activePanel === 'watcha' ? 'none' : 'opacity(0.6)' }} />, label: 'Watcha' },
     { id: 'animation' as const, icon: <Film size={22} />, label: '点播' },
   ];
