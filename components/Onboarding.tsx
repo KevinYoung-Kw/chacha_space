@@ -52,8 +52,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                <div className="absolute -inset-4 border border-purple-200 rounded-full opacity-50 animate-ping-slow"></div>
             </div>
             <div>
-                <h1 className="text-3xl font-bold text-gray-800 tracking-tight">嗨，我是 塔塔</h1>
-                <p className="text-gray-500 mt-3 text-lg font-medium">你来自未来的虚拟情感伙伴</p>
+                <h1 className="text-3xl font-bold text-gray-800 tracking-tight">嗨，我是叉叉 ✨</h1>
+                <p className="text-gray-500 mt-3 text-lg font-medium">来自2045年的AI极简主义整理师</p>
             </div>
             <div className="bg-white/50 backdrop-blur-sm p-4 rounded-2xl border border-white/60 text-sm text-gray-500 w-full max-w-xs text-left shadow-sm">
               <p className="mb-2 font-bold text-gray-700">即将开启的功能：</p>
@@ -123,7 +123,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                 />
               </div>
               <div className="group">
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 group-focus-within:text-purple-500 transition-colors">对塔塔有什么期待？</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 group-focus-within:text-purple-500 transition-colors">对叉叉有什么期待？</label>
                 <textarea 
                   className="w-full p-4 bg-gray-50/50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-purple-200 focus:border-purple-400 outline-none h-32 resize-none transition-all"
                   placeholder="例如：希望能提醒我早睡，帮我记账，或者只是聊聊天..."
@@ -146,8 +146,8 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                </div>
             </div>
             
-            <h1 className="text-2xl font-bold text-gray-800">记忆同步完成</h1>
-            <p className="text-gray-500">我已经成功与你的时间线建立连接。</p>
+            <h1 className="text-2xl font-bold text-gray-800">时间线同步完成 ✓</h1>
+            <p className="text-gray-500">叉叉已成功连接到你的时空坐标</p>
             
             {/* Summary Card Stack Visual */}
             <div className="w-full max-w-xs relative h-24 mt-4 perspective-1000">

@@ -10,16 +10,43 @@ import HealthPanel from './components/tools/HealthPanel';
 import TodoPanel from './components/tools/TodoPanel';
 import SkillsPanel from './components/tools/SkillsPanel';
 import VoicePanel from './components/tools/VoicePanel';
-import { generateAssistantResponse } from './services/geminiService';
+import WatchaPanel from './components/tools/WatchaPanel';
+import { generateAssistantResponse, AgentActions, HealthData } from './services/geminiService';
 import { generateSpeech } from './services/minimaxService';
 import { decodeAudioData, playAudioBuffer } from './services/audioService';
 import { getWeatherByLocation, getWeatherByIP } from './services/weatherService';
 import { createCustomConfig } from './config/characterConfig';
-import { CloudSun, Sparkles, Notebook, Zap, Settings, X, Bell, Clock, Mic2, Activity, CheckSquare, Calendar, Image, Phone } from 'lucide-react';
+import { CloudSun, Sparkles, Notebook, Zap, Settings, X, Bell, Clock, Mic2, Activity, CheckSquare, Calendar, Image, Phone, Globe } from 'lucide-react';
+
+// 塔罗牌数据库
+const TAROT_CARDS = [
+  { name: '愚者', upright: '新的开始、冒险、纯真', reversed: '鲁莽、冒险过度' },
+  { name: '魔术师', upright: '创造力、技能、意志力', reversed: '欺骗、能力不足' },
+  { name: '女祭司', upright: '直觉、神秘、内在智慧', reversed: '隐藏的信息、不信任直觉' },
+  { name: '皇后', upright: '丰盛、母性、创造', reversed: '依赖、创造力受阻' },
+  { name: '皇帝', upright: '权威、结构、领导力', reversed: '专制、缺乏纪律' },
+  { name: '教皇', upright: '传统、指导、信仰', reversed: '打破常规、个人信念' },
+  { name: '恋人', upright: '爱情、和谐、选择', reversed: '不和谐、价值观冲突' },
+  { name: '战车', upright: '胜利、决心、控制', reversed: '缺乏方向、失控' },
+  { name: '力量', upright: '勇气、内在力量、耐心', reversed: '自我怀疑、软弱' },
+  { name: '隐士', upright: '内省、寻求、指引', reversed: '孤立、逃避' },
+  { name: '命运之轮', upright: '好运、命运、转折点', reversed: '厄运、抗拒改变' },
+  { name: '正义', upright: '公平、真相、因果', reversed: '不公、逃避责任' },
+  { name: '倒吊人', upright: '牺牲、新视角、等待', reversed: '拖延、无谓牺牲' },
+  { name: '死神', upright: '结束、转变、新生', reversed: '抗拒改变、停滞' },
+  { name: '节制', upright: '平衡、耐心、目的', reversed: '失衡、过度' },
+  { name: '恶魔', upright: '束缚、物质主义、诱惑', reversed: '解脱、恢复控制' },
+  { name: '塔', upright: '突变、启示、觉醒', reversed: '逃避灾难、恐惧改变' },
+  { name: '星星', upright: '希望、灵感、宁静', reversed: '失望、缺乏信心' },
+  { name: '月亮', upright: '直觉、潜意识、幻象', reversed: '困惑消散、面对恐惧' },
+  { name: '太阳', upright: '快乐、成功、活力', reversed: '暂时挫折、缺乏热情' },
+  { name: '审判', upright: '觉醒、重生、内在召唤', reversed: '自我怀疑、逃避召唤' },
+  { name: '世界', upright: '完成、整合、成就', reversed: '不完整、缺乏closure' },
+];
 
 // Panel Types
 type LeftPanelType = 'none' | 'info_weather' | 'info_fortune' | 'info_health';
-type RightPanelType = 'none' | 'prod_todo' | 'prod_skills' | 'prod_voice';
+type RightPanelType = 'none' | 'prod_todo' | 'prod_skills' | 'prod_voice' | 'prod_watcha';
 
 const App: React.FC = () => {
   // --- State ---
@@ -41,7 +68,7 @@ const App: React.FC = () => {
   
   // Data States
   const [todos, setTodos] = useState<TodoItem[]>([
-    { id: '1', text: '跟塔塔打个招呼', completed: false, priority: 'high', category: 'work' },
+    { id: '1', text: '跟叉叉打个招呼', completed: false, priority: 'high', category: 'work' },
   ]);
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [isListening, setIsListening] = useState(false);
@@ -110,30 +137,163 @@ const App: React.FC = () => {
     }
   };
 
+  // 生成塔罗牌占卜结果
+  const generateTarotReading = (question: string): TarotResult => {
+    // 随机抽取3张牌
+    const shuffled = [...TAROT_CARDS].sort(() => Math.random() - 0.5);
+    const drawnCards = shuffled.slice(0, 3).map((card, index) => {
+      const isReversed = Math.random() > 0.6;
+      const positions = ['过去', '现在', '未来'];
+      return {
+        name: card.name,
+        position: positions[index],
+        meaning: isReversed ? card.reversed : card.upright,
+        orientation: (isReversed ? 'reversed' : 'upright') as 'upright' | 'reversed'
+      };
+    });
+
+    // 生成分析
+    const analysis = `关于「${question}」的占卜显示：
+${drawnCards[0].name}代表你的过去，暗示${drawnCards[0].meaning}；
+${drawnCards[1].name}象征当下的状态，意味着${drawnCards[1].meaning}；
+${drawnCards[2].name}指向未来的可能，预示${drawnCards[2].meaning}。`;
+
+    const advice = drawnCards[2].orientation === 'upright' 
+      ? '整体来看运势不错，继续保持积极的心态吧！'
+      : '可能会遇到一些挑战，但这也是成长的机会哦~';
+
+    return {
+      type: 'tarot',
+      cards: drawnCards,
+      analysis,
+      advice
+    };
+  };
+
   const processInput = async (text: string) => {
     addMessage('user', text);
     setState(AssistantState.THINKING);
 
-    const actions = {
-      onAddTodo: (text: string) => {
+    // 完整的 Agent Actions
+    const actions: AgentActions = {
+      // --- 待办事项 ---
+      onAddTodo: (todoText: string, priority?: string, category?: string) => {
         setTodos(prev => {
-            setHasNewTodo(true);
-            setTimeout(() => setHasNewTodo(false), 2000);
-            return [...prev, { id: Date.now().toString(), text, completed: false, priority: 'medium' }];
+          setHasNewTodo(true);
+          setTimeout(() => setHasNewTodo(false), 2000);
+          return [...prev, { 
+            id: Date.now().toString(), 
+            text: todoText, 
+            completed: false, 
+            priority: (priority as 'high' | 'medium' | 'low') || 'medium',
+            category: category as 'health' | 'work' | 'dev' | 'content' | undefined
+          }];
         });
-        setRightPanel('prod_todo'); // Auto-open todo panel
+        setRightPanel('prod_todo');
       },
+      
+      onToggleTodo: (searchText: string): boolean => {
+        let found = false;
+        setTodos(prev => prev.map(t => {
+          if (t.text.includes(searchText)) {
+            found = true;
+            return { ...t, completed: !t.completed };
+          }
+          return t;
+        }));
+        if (found) setRightPanel('prod_todo');
+        return found;
+      },
+      
+      onDeleteTodo: (searchText: string): boolean => {
+        let found = false;
+        setTodos(prev => {
+          const newTodos = prev.filter(t => {
+            if (t.text.includes(searchText)) {
+              found = true;
+              return false;
+            }
+            return true;
+          });
+          return newTodos;
+        });
+        return found;
+      },
+
+      // --- 天气 ---
       onSetWeather: (data: WeatherData) => {
         setWeather(data);
-        setLeftPanel('info_weather'); // Auto-open weather panel
+        setLeftPanel('info_weather');
+      },
+
+      // --- 健康追踪 ---
+      onAddWater: (amount?: number) => {
+        const addAmount = amount || 250;
+        setHealthData(prev => ({
+          ...prev,
+          water: { 
+            ...prev.water, 
+            current: prev.water.current + addAmount,
+            history: [...prev.water.history, { 
+              time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }), 
+              amount: addAmount, 
+              type: '水' 
+            }]
+          }
+        }));
+        setLeftPanel('info_health');
+      },
+      
+      onGetHealthStatus: (): HealthData => {
+        return healthData;
+      },
+
+      // --- 占卜 ---
+      onDrawTarot: (question?: string): TarotResult => {
+        const result = generateTarotReading(question || '今日运势');
+        setTarot(result);
+        setLeftPanel('info_fortune');
+        return result;
+      },
+
+      // --- 面板控制 ---
+      onOpenPanel: (panel: string) => {
+        switch (panel) {
+          case 'weather':
+            setLeftPanel('info_weather');
+            break;
+          case 'health':
+            setLeftPanel('info_health');
+            break;
+          case 'fortune':
+            setLeftPanel('info_fortune');
+            break;
+          case 'todo':
+            setRightPanel('prod_todo');
+            break;
+          case 'skills':
+            setRightPanel('prod_skills');
+            break;
+          case 'voice':
+            setRightPanel('prod_voice');
+            break;
+          case 'watcha':
+            setRightPanel('prod_watcha');
+            break;
+        }
       }
     };
 
     const responseText = await generateAssistantResponse(
-        messages, 
-        text, 
-        { todos, weather },
-        actions
+      messages, 
+      text, 
+      { 
+        todos, 
+        weather,
+        healthData,
+        userName: userProfile?.name
+      },
+      actions
     );
 
     addMessage('assistant', responseText);
@@ -159,7 +319,7 @@ const App: React.FC = () => {
 
   // --- Setup ---
   useEffect(() => {
-     const saved = localStorage.getItem('tata_profile');
+     const saved = localStorage.getItem('chacha_profile');
      if (saved) setUserProfile(JSON.parse(saved));
 
      // 防止 React StrictMode 双重调用导致的重复请求
@@ -214,8 +374,8 @@ const App: React.FC = () => {
 
   const handleOnboardingComplete = (profile: UserProfile) => {
       setUserProfile(profile);
-      localStorage.setItem('tata_profile', JSON.stringify(profile));
-      const intro = `很高兴遇见你，${profile.name}。我是 塔塔。`;
+      localStorage.setItem('chacha_profile', JSON.stringify(profile));
+      const intro = `嗨！${profile.name}，很高兴遇见你！我是叉叉，来自2045年的你亲手创造的AI助手～让我们一起把生活整理得井井有条吧！`;
       addMessage('assistant', intro);
       speak(intro);
   };
@@ -380,6 +540,20 @@ const App: React.FC = () => {
                     label="声音"
                     position="right"
                 />
+                <ToolbarIcon 
+                    icon={
+                        <img 
+                            src="/watcha.svg" 
+                            alt="Watcha" 
+                            className="w-5 h-5"
+                            style={{ filter: rightPanel === 'prod_watcha' ? 'none' : 'opacity(0.6)' }}
+                        />
+                    } 
+                    active={rightPanel === 'prod_watcha'} 
+                    onClick={() => setRightPanel(rightPanel === 'prod_watcha' ? 'none' : 'prod_watcha')}
+                    label="Watcha"
+                    position="right"
+                />
             </div>
 
             {/* Slide-out Content Card */}
@@ -399,6 +573,7 @@ const App: React.FC = () => {
                                 onVoiceSelected={handleVoiceSelected} 
                             />
                         )}
+                        {rightPanel === 'prod_watcha' && <WatchaPanel />}
                     </div>
                 </div>
             )}

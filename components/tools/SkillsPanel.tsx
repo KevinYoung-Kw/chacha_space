@@ -25,7 +25,7 @@ const SkillsPanel: React.FC = () => {
                     </div>
                     <div>
                         <h2 className="text-xl font-bold text-[var(--color-text-primary)]">能力开关</h2>
-                        <p className="text-xs text-[var(--color-text-muted)]">自定义塔塔的助手技能</p>
+                        <p className="text-xs text-[var(--color-text-muted)]">自定义叉叉的助手技能</p>
                     </div>
                 </div>
              </div>

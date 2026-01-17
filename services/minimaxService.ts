@@ -11,8 +11,7 @@ const hexToArrayBuffer = (hex: string): ArrayBuffer => {
 };
 
 export const generateSpeech = async (text: string, voiceId?: string): Promise<ArrayBuffer | null> => {
-  const { apiKey } = config.minimax;
-  const defaultVoiceId = config.minimax.voiceId || "female-shaonv";
+  const { apiKey, voiceId: defaultVoiceId, ttsModel, baseUrl } = config.minimax;
 
   if (!apiKey) {
     console.warn("MiniMax API Key missing. Falling back to native TTS.");
@@ -23,7 +22,7 @@ export const generateSpeech = async (text: string, voiceId?: string): Promise<Ar
   const effectiveVoiceId = voiceId || defaultVoiceId;
 
   // MiniMax T2A V2 Endpoint
-  const url = `https://api.minimaxi.com/v1/t2a_v2`;
+  const url = `${baseUrl}/v1/t2a_v2`;
 
   try {
     const response = await fetch(url, {
@@ -33,7 +32,7 @@ export const generateSpeech = async (text: string, voiceId?: string): Promise<Ar
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: "speech-2.6-hd",
+        model: ttsModel,
         text: text,
         stream: false,
         voice_setting: {
@@ -77,10 +76,10 @@ export const generateSpeech = async (text: string, voiceId?: string): Promise<Ar
 };
 
 export const designVoice = async (prompt: string, previewText: string): Promise<{ voiceId: string, audio: ArrayBuffer } | null> => {
-    const { apiKey } = config.minimax;
+    const { apiKey, baseUrl } = config.minimax;
     if (!apiKey) return null;
 
-    const url = `https://api.minimaxi.com/v1/voice_design`;
+    const url = `${baseUrl}/v1/voice_design`;
 
     try {
         const response = await fetch(url, {

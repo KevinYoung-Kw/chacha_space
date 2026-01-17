@@ -101,7 +101,7 @@ const Widgets: React.FC<WidgetsProps> = ({ todos, weather, onToggleTodo }) => {
         {todos.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-24 text-[var(--color-text-muted)] text-sm">
             <p>暂无进行中的任务</p>
-            <p className="text-xs mt-1 text-[var(--color-accent-rose)]">告诉塔塔 "添加一个新任务"</p>
+            <p className="text-xs mt-1 text-[var(--color-accent-rose)]">告诉叉叉「添加一个新任务」</p>
           </div>
         ) : (
           <ul className="space-y-2">

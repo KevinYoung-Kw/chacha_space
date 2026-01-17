@@ -48,14 +48,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           <div className="flex flex-col gap-3 text-sm">
             {messages.length === 0 ? (
               <div className="text-[#8b7b6d] text-center py-2 italic">
-                和叉叉打个招呼吧~
+                和叉叉打个招呼吧～
               </div>
             ) : (
               <>
                 {messages.map((msg, idx) => (
                   <div key={msg.id || idx} className="text-[#5c4d43] animate-fade-in-up">
                     <span className="font-semibold text-[#8b7b6d]">
-                      {msg.role === 'user' ? '【我】' : '【叉叉】'}：
+                      {msg.role === 'user' ? '【我】' : '【叉叉】'}
                     </span>
                     <span>{msg.content}</span>
                   </div>
