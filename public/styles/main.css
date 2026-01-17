@@ -312,3 +312,88 @@ body {
 .toolbar-label.active {
   color: var(--color-text-primary);
 }
+
+/* ========================================
+   手机端适配
+   ======================================== */
+
+/* 安全区域内边距（针对有刘海/底部条的设备） */
+.safe-area-pb {
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+
+.safe-area-pt {
+  padding-top: max(8px, env(safe-area-inset-top));
+}
+
+/* 手机端面板上滑动画 */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-slide-up {
+  animation: slideUp 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* 手机端面板下滑关闭动画 */
+@keyframes slideDown {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+}
+.animate-slide-down {
+  animation: slideDown 0.25s ease-out forwards;
+}
+
+/* ========================================
+   响应式调整
+   ======================================== */
+
+/* 手机端工具栏图标大小 */
+@media (max-width: 640px) {
+  .toolbar-btn {
+    width: 40px;
+    height: 40px;
+  }
+  
+  .toolbar-label {
+    font-size: 10px;
+    margin-top: 2px;
+  }
+  
+  /* 优化触摸目标大小 */
+  button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* 手机端对话框样式 */
+  .chat-container {
+    border-radius: 1.25rem;
+  }
+}
+
+/* 大屏幕优化 */
+@media (min-width: 1280px) {
+  .glass-panel-strong {
+    box-shadow: var(--shadow-strong);
+  }
+}
+
+/* 超大屏幕优化 */
+@media (min-width: 1536px) {
+  :root {
+    --glass-blur-strong: 28px;
+  }
+}

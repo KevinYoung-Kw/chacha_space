@@ -87,9 +87,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   return (
     <div className="w-full pointer-events-auto">
       {/* Combined Dialog Box - Glass morphism container */}
-      <div className="chat-container glass-panel rounded-[1.8rem] overflow-hidden">
+      <div className="chat-container rounded-[1.8rem] overflow-hidden" style={{ 
+        background: 'rgba(245, 240, 232, 0.15)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        border: '1px solid rgba(230, 221, 208, 0.6)',
+        boxShadow: '0 4px 20px rgba(92, 77, 67, 0.08)'
+      }}>
         {/* Dialog Display Area - Shows conversation with scrolling */}
-        <div className="px-5 py-4 max-h-[180px] min-h-[80px] overflow-y-auto border-b border-[#e6ddd0]/40 scrollbar-custom">
+        <div className="px-5 py-4 max-h-[180px] min-h-[80px] overflow-y-auto border-b border-[#e6ddd0]/40 scrollbar-custom bg-transparent">
           <div className="flex flex-col gap-3 text-sm">
             {messages.length === 0 ? (
               <div className="text-[#8b7b6d] text-center py-2 italic">
@@ -112,7 +118,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         </div>
 
         {/* Input Bar - Bottom section */}
-        <div className="px-4 py-3 flex items-center gap-3">
+        <div className="px-4 py-3 flex items-center gap-3 bg-transparent">
           {/* Text Input */}
           <div className="flex-1 h-[36px] relative">
               <input

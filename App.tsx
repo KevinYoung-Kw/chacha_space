@@ -92,6 +92,8 @@ const App: React.FC = () => {
   
   // 响应式屏幕大小检测
   const [isSmallScreen, setIsSmallScreen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isLargeScreen, setIsLargeScreen] = useState(false);
 
   const [state, setState] = useState<AssistantState>(AssistantState.IDLE);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -543,7 +545,10 @@ const App: React.FC = () => {
   // --- 监听屏幕大小变化 ---
   useEffect(() => {
     const checkScreenSize = () => {
-      setIsSmallScreen(window.innerWidth < 768);
+      const width = window.innerWidth;
+      setIsMobile(width < 640); // 手机端
+      setIsSmallScreen(width < 768); // 小屏幕（平板竖屏）
+      setIsLargeScreen(width >= 1280); // 大屏幕
     };
     
     checkScreenSize();
@@ -658,6 +663,80 @@ const App: React.FC = () => {
   // 判断是否有面板打开
   const hasPanelOpen = activePanel !== 'none';
 
+  // 渲染面板内容（避免代码重复）
+  const renderPanelContent = () => {
+    switch (activePanel) {
+      case 'weather':
+        return weather ? <WeatherPanel weather={weather} /> 
+          : <div className="p-8 text-center text-gray-500 flex flex-col items-center justify-center h-full gap-2">
+              <span>正在校准时间线...</span>
+            </div>;
+      case 'health':
+        return <HealthPanel {...healthData} onAddWater={handleAddWater} />;
+      case 'fortune':
+        return <DivinationPanel result={tarot} />;
+      case 'todo':
+        return (
+          <TodoPanel 
+            categories={categories}
+            todos={todos} 
+            onToggle={async (id) => {
+              const previousTodo = todos.find(todo => todo.id === id);
+              await todoApi.toggle(id);
+              const result = await todoApi.getList(true);
+              if (result.success && result.data) {
+                setTodos(result.data);
+                const updatedTodo = result.data.find(todo => todo.id === id);
+                if (previousTodo && updatedTodo && !previousTodo.completed && updatedTodo.completed) {
+                  await applyAffinityChange('todo_complete');
+                }
+              }
+            }}
+            onAddTodo={async (todo) => {
+              const result = await todoApi.create(todo);
+              if (result.success) {
+                const listResult = await todoApi.getList(true);
+                if (listResult.success && listResult.data) {
+                  setTodos(listResult.data);
+                }
+                await applyAffinityChange('todo_add');
+              }
+            }}
+            onDelete={async (id) => {
+              await todoApi.delete(id);
+              const result = await todoApi.getList(true);
+              if (result.success && result.data) {
+                setTodos(result.data);
+              }
+            }}
+          />
+        );
+      case 'skills':
+        return <SkillsPanel />;
+      case 'watcha':
+        return <WatchaPanel />;
+      case 'animation':
+        return (
+          <AnimationPanel 
+            onPlayAnimation={(actionName) => {
+              videoAvatarRef.current?.playAction(actionName);
+              const voiceText = actionVoiceMap[actionName];
+              if (voiceText) {
+                speak(voiceText);
+              }
+            }}
+            affinity={affinity}
+          />
+        );
+      case 'memory':
+        return <MemoryPanel onClose={() => setActivePanel('none')} />;
+      case 'affinity':
+        return <AffinityDetailPanel affinity={affinity} onClose={() => setActivePanel('none')} />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-[#fdfcf8] text-[#5c4d43] font-sans overflow-hidden selection:bg-[#e6dec8]">
         {/* Background Image */}
@@ -672,6 +751,13 @@ const App: React.FC = () => {
         ></div>
         {/* Subtle overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#fdfcf8]/30 pointer-events-none"></div>
+
+        {/* Logo - 左上角 */}
+        <div className="absolute top-4 left-4 sm:left-6 z-50">
+          <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-[#5c4d43] tracking-wide" style={{ fontFamily: "'Ma Shan Zheng', 'Zhi Mang Xing', cursive" }}>
+            叉叉的空间
+          </h1>
+        </div>
 
         {/* 用户信息和登出按钮 */}
         <div className="absolute top-4 right-4 z-50 flex items-center gap-3">
@@ -695,10 +781,10 @@ const App: React.FC = () => {
         </div>
 
         {/* === 主布局容器 === */}
-        <div className="relative h-full w-full flex">
+        <div className="relative h-full w-full flex flex-col sm:flex-row">
           
-          {/* --- 左侧工具栏区域 --- */}
-          <div className="flex-shrink-0 flex items-center justify-center z-30 w-16 sm:w-20 md:w-24 transition-all duration-500 overflow-visible">
+          {/* --- 左侧工具栏区域 (仅桌面端显示) --- */}
+          <div className="hidden sm:flex flex-shrink-0 items-center justify-center z-30 w-16 sm:w-20 md:w-24 lg:w-28 transition-all duration-500 overflow-visible">
             <ScrollableToolbar 
               activePanel={activePanel} 
               setActivePanel={setActivePanel} 
@@ -706,6 +792,7 @@ const App: React.FC = () => {
               videoAvatarRef={videoAvatarRef}
               affinity={affinity}
               setAffinity={setAffinity}
+              isMobile={false}
             />
           </div>
 
@@ -715,11 +802,24 @@ const App: React.FC = () => {
             transition-all duration-500 ease-in-out
           `}>
             {/* Speech Bubble - 绝对定位在叉叉上方 */}
-            <div className="absolute top-20 left-0 right-0 w-full max-w-sm md:max-w-md lg:max-w-lg h-20 md:h-28 flex items-end justify-center mb-2 px-4 pointer-events-none mx-auto z-20">
+            <div className={`
+              absolute left-0 right-0 w-full flex items-end justify-center mb-2 px-3 sm:px-4 pointer-events-none mx-auto z-20
+              ${isMobile 
+                ? 'top-4 max-w-[85%] h-16' 
+                : 'top-20 max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl h-20 md:h-28'}
+            `}>
                 {state === AssistantState.SPEAKING && latestResponse && (
-                <div className="bg-white/90 backdrop-blur-md border border-purple-100 px-4 md:px-6 py-3 md:py-4 rounded-2xl md:rounded-3xl rounded-bl-none shadow-xl text-xs sm:text-sm md:text-base font-medium text-gray-700 animate-fade-in-up relative max-w-full text-center">
+                <div className={`
+                  bg-white/90 backdrop-blur-md border border-purple-100 shadow-xl font-medium text-gray-700 animate-fade-in-up relative max-w-full text-center
+                  ${isMobile 
+                    ? 'px-3 py-2 rounded-xl rounded-bl-none text-xs' 
+                    : 'px-4 md:px-6 py-3 md:py-4 rounded-2xl md:rounded-3xl rounded-bl-none text-xs sm:text-sm md:text-base'}
+                `}>
                         {latestResponse}
-                  <div className="absolute -bottom-2 left-4 md:left-6 w-3 md:w-4 h-3 md:h-4 bg-white/90 border-b border-r border-purple-100 transform rotate-45"></div>
+                  <div className={`
+                    absolute bg-white/90 border-b border-r border-purple-100 transform rotate-45
+                    ${isMobile ? '-bottom-1.5 left-3 w-2.5 h-2.5' : '-bottom-2 left-4 md:left-6 w-3 md:w-4 h-3 md:h-4'}
+                  `}></div>
                     </div>
                 )}
              </div>
@@ -727,14 +827,25 @@ const App: React.FC = () => {
             {/* Character - 绝对定位居中 */}
             <div 
               className={`
-                absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2
-                flex items-center justify-center pointer-events-auto 
+                absolute flex items-center justify-center pointer-events-auto 
                 transition-all duration-500 ease-out
-                h-[40vh] sm:h-[45vh] md:h-[55vh] lg:h-[60vh]
-                ${hasPanelOpen ? 'w-[280px] sm:w-[340px] md:w-[400px] lg:w-[460px]' : 'w-[340px] sm:w-[400px] md:w-[460px] lg:w-[520px]'}
+                ${isMobile 
+                  ? 'top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 h-[38vh] w-[280px]' 
+                  : `top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 
+                     h-[40vh] sm:h-[45vh] md:h-[55vh] lg:h-[60vh] xl:h-[65vh] 2xl:h-[70vh]
+                     ${hasPanelOpen 
+                       ? 'w-[280px] sm:w-[340px] md:w-[400px] lg:w-[460px] xl:w-[500px]' 
+                       : 'w-[340px] sm:w-[400px] md:w-[460px] lg:w-[520px] xl:w-[580px] 2xl:w-[640px]'}`
+                }
               `}
               style={{
-                transform: isSmallScreen ? 'translate(-50%, -50%) scale(1.45)' : 'translate(-50%, -50%) scale(1.35)',
+                transform: isMobile 
+                  ? 'translate(-50%, -50%) scale(1.3)' 
+                  : isSmallScreen 
+                    ? 'translate(-50%, -50%) scale(1.45)' 
+                    : isLargeScreen 
+                      ? 'translate(-50%, -50%) scale(1.5)' 
+                      : 'translate(-50%, -50%) scale(1.35)',
                 transformOrigin: 'center center'
               }}
             >
@@ -757,9 +868,14 @@ const App: React.FC = () => {
 
             {/* Chat Interface - 绝对定位在底部 */}
             <div className={`
-              absolute bottom-0 left-0 right-0
-              w-full px-3 md:px-4 pb-4 md:pb-6 mx-auto
-              ${hasPanelOpen ? 'max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl' : 'max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-3xl'}
+              absolute left-0 right-0 w-full mx-auto
+              ${isMobile 
+                ? 'bottom-[72px] px-3 pb-2 max-w-full' 
+                : `bottom-0 px-3 md:px-4 pb-4 md:pb-6 
+                   ${hasPanelOpen 
+                     ? 'max-w-md sm:max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl' 
+                     : 'max-w-md md:max-w-lg lg:max-w-xl xl:max-w-2xl 2xl:max-w-4xl'}`
+              }
             `}>
               <ChatInterface 
                 messages={messages}
@@ -773,121 +889,162 @@ const App: React.FC = () => {
             </div>
             </div>
 
-          {/* --- 右侧面板区域 --- */}
+          {/* --- 右侧面板区域 (仅桌面端显示) --- */}
           <div className={`
-            flex items-center justify-start z-30 
+            hidden sm:flex items-center justify-start z-30 
             transition-all duration-500 ease-in-out
             ${hasPanelOpen 
-              ? 'w-[380px] sm:w-[440px] md:w-[480px] lg:w-[520px] opacity-100 pr-5 sm:pr-6 md:pr-8' 
+              ? 'w-[380px] sm:w-[440px] md:w-[480px] lg:w-[520px] xl:w-[560px] 2xl:w-[600px] opacity-100 pr-5 sm:pr-6 md:pr-8 lg:pr-10' 
               : 'w-0 opacity-0 pointer-events-none pr-0'
             }
           `} style={{ overflow: 'hidden' }}>
             {hasPanelOpen && (
               <div className={`
-                w-[360px] sm:w-[420px] md:w-[460px] lg:w-[480px] h-[84vh] max-h-[720px] 
+                w-[360px] sm:w-[420px] md:w-[460px] lg:w-[500px] xl:w-[540px] 2xl:w-[580px] 
+                h-[84vh] max-h-[800px] xl:max-h-[880px] 2xl:max-h-[960px]
                 flex-shrink-0 transition-all duration-500 ease-out
                 ${hasPanelOpen ? 'translate-x-0 opacity-100' : 'translate-x-12 opacity-0'}
               `}>
                 <div className="h-full w-full rounded-2xl sm:rounded-3xl lg:rounded-[2rem] overflow-hidden glass-panel-strong border border-white/50 shadow-strong">
-                  {activePanel === 'weather' && (
-                    weather ? <WeatherPanel weather={weather} /> 
-                    : <div className="p-8 text-center text-gray-500 flex flex-col items-center justify-center h-full gap-2">
-                        <span>正在校准时间线...</span>
-                      </div>
-                  )}
-                  {activePanel === 'health' && (
-                    <HealthPanel 
-                      {...healthData}
-                      onAddWater={handleAddWater}
-                    />
-                  )}
-                  {activePanel === 'fortune' && <DivinationPanel result={tarot} />}
-                  {activePanel === 'todo' && (
-                    <TodoPanel 
-                      categories={categories}
-                      todos={todos} 
-                      onToggle={async (id) => {
-                        const previousTodo = todos.find(todo => todo.id === id);
-                        await todoApi.toggle(id);
-                        const result = await todoApi.getList(true);
-                        if (result.success && result.data) {
-                          setTodos(result.data);
-                          const updatedTodo = result.data.find(todo => todo.id === id);
-                          if (previousTodo && updatedTodo && !previousTodo.completed && updatedTodo.completed) {
-                            await applyAffinityChange('todo_complete');
-                          }
-                        }
-                      }}
-                      onAddTodo={async (todo) => {
-                        const result = await todoApi.create(todo);
-                        if (result.success) {
-                          const listResult = await todoApi.getList(true);
-                        if (listResult.success && listResult.data) {
-                          setTodos(listResult.data);
-                        }
-                        await applyAffinityChange('todo_add');
-                      }
-                      }}
-                      onDelete={async (id) => {
-                        await todoApi.delete(id);
-                        const result = await todoApi.getList(true);
-                        if (result.success && result.data) {
-                          setTodos(result.data);
-                        }
-                      }}
-                    />
-                  )}
-                  {activePanel === 'skills' && <SkillsPanel />}
-                  {activePanel === 'watcha' && <WatchaPanel />}
-                  {activePanel === 'animation' && (
-                    <AnimationPanel 
-                      onPlayAnimation={(actionName) => {
-                        videoAvatarRef.current?.playAction(actionName);
-                        // 播放对应的语音
-                        const voiceText = actionVoiceMap[actionName];
-                        if (voiceText) {
-                          speak(voiceText);
-                        }
-                      }}
-                      affinity={affinity}
-                    />
-                  )}
-                  {activePanel === 'memory' && (
-                    <MemoryPanel 
-                      onClose={() => setActivePanel('none')}
-                    />
-                  )}
-                  {activePanel === 'affinity' && (
-                    <AffinityDetailPanel 
-                      affinity={affinity}
-                      onClose={() => setActivePanel('none')}
-                    />
-                  )}
+                  {renderPanelContent()}
                 </div>
               </div>
             )}
           </div>
+
+          {/* --- 手机端底部工具栏 --- */}
+          {isMobile && (
+            <div className="fixed bottom-0 left-0 right-0 z-40">
+              <MobileToolbar 
+                activePanel={activePanel} 
+                setActivePanel={setActivePanel} 
+                hasNewTodo={hasNewTodo} 
+                videoAvatarRef={videoAvatarRef}
+                affinity={affinity}
+                setAffinity={setAffinity}
+              />
+            </div>
+          )}
+
+          {/* --- 手机端全屏面板 --- */}
+          {isMobile && hasPanelOpen && (
+            <div className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm animate-fade-in">
+              <div 
+                className="absolute inset-x-0 bottom-0 top-16 bg-white/95 backdrop-blur-xl rounded-t-3xl shadow-2xl animate-slide-up overflow-hidden"
+                style={{ maxHeight: 'calc(100vh - 4rem)' }}
+              >
+                {/* 关闭按钮 */}
+                <button 
+                  onClick={() => setActivePanel('none')}
+                  className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors"
+                >
+                  <span className="text-lg">×</span>
+                </button>
+                <div className="h-full overflow-auto">
+                  {renderPanelContent()}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
      </div>
     );
   };
 
-// Scrollable Toolbar Component
-const ScrollableToolbar = ({ 
-  activePanel, 
-  setActivePanel, 
-  hasNewTodo,
-  videoAvatarRef,
-  affinity,
-  setAffinity
-}: { 
+// 工具栏通用 props
+interface ToolbarProps {
   activePanel: ActivePanelType;
   setActivePanel: (panel: ActivePanelType) => void;
   hasNewTodo: boolean;
   videoAvatarRef: React.RefObject<VideoAvatarRef | null>;
   affinity: AffinityData;
   setAffinity: (affinity: AffinityData) => void;
+  isMobile?: boolean;
+}
+
+// 手机端底部工具栏
+const MobileToolbar: React.FC<ToolbarProps> = ({ 
+  activePanel, 
+  setActivePanel, 
+  hasNewTodo,
+  videoAvatarRef,
+  affinity,
+  setAffinity
+}) => {
+  // 获取当前好感度等级数字（v1 = 1, v2 = 2, ...）
+  const affinityLevelNum = parseInt(affinity.level.replace('v', '')) || 1;
+
+  const togglePanel = (panel: ActivePanelType) => {
+    const newState = activePanel === panel ? 'none' : panel;
+    setActivePanel(newState);
+    
+    // 隐藏测试功能：打开 Watcha 面板时提升 5 级好感度
+    if (panel === 'watcha' && newState === 'watcha') {
+      const currentValue = affinity.value;
+      const targetValue = Math.min(1000, currentValue + 500);
+      const newAffinity = {
+        ...affinity,
+        value: targetValue,
+        level: getAffinityLevel(targetValue),
+        lastInteraction: Date.now(),
+      };
+      setAffinity(newAffinity);
+      saveAffinityData(newAffinity);
+      videoAvatarRef.current?.playAction('excited');
+    }
+    
+    if (panel === 'todo' && newState === 'todo') {
+      videoAvatarRef.current?.playAction('wave');
+    }
+  };
+
+  // 手机端显示的核心工具（精简版）
+  const tools = [
+    { id: 'health' as const, icon: <Activity size={20} />, label: '健康' },
+    { id: 'todo' as const, icon: <CheckSquare size={20} />, label: '待办', notification: hasNewTodo },
+    { id: 'fortune' as const, icon: <Sparkles size={20} />, label: '占卜' },
+    { id: 'weather' as const, icon: <CloudSun size={20} />, label: '天气' },
+    { id: 'affinity' as const, icon: <AffinityIndicator variant="toolbar" affinity={affinity} />, label: '好感度' },
+  ];
+
+  return (
+    <div className="bg-white/90 backdrop-blur-xl border-t border-gray-200/50 shadow-lg">
+      <div className="flex items-center justify-around px-2 py-2 safe-area-pb">
+        {tools.map((tool) => (
+          <button
+            key={tool.id}
+            onClick={() => togglePanel(tool.id)}
+            className={`
+              relative flex flex-col items-center justify-center px-3 py-1.5 rounded-xl transition-all duration-200
+              ${activePanel === tool.id 
+                ? 'bg-[#e6ddd0] text-[#5c4d43]' 
+                : 'text-[#8b7b6d] active:bg-gray-100'}
+            `}
+          >
+            <span className="relative">
+              {tool.icon}
+              {tool.notification && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-rose-500 rounded-full border border-white"></span>
+              )}
+            </span>
+            <span className="text-[10px] mt-0.5 font-medium">{tool.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Scrollable Toolbar Component (桌面端)
+const ScrollableToolbar: React.FC<ToolbarProps> = ({ 
+  activePanel, 
+  setActivePanel, 
+  hasNewTodo,
+  videoAvatarRef,
+  affinity,
+  setAffinity,
+  isMobile = false
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const toolRefs = useRef<Map<string, HTMLDivElement>>(new Map());
