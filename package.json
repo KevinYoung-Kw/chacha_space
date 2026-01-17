@@ -1,12 +1,22 @@
 {
-  "name": "kizuna-ai---virtual-assistant-mvp",
+  "name": "chacha-ai-assistant",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "description": "叉叉 AI 虚拟助手 - 来自 2045 年的贴心伙伴",
   "scripts": {
     "dev": "vite",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:backend\"",
     "build": "vite build",
-    "preview": "vite preview"
+    "build:backend": "cd backend && npm run build",
+    "build:all": "npm run build && npm run build:backend",
+    "preview": "vite preview",
+    "start": "cd backend && npm start",
+    "docker:build": "docker build -t chacha-assistant .",
+    "docker:run": "docker run -p 7860:7860 --name chacha -d chacha-assistant",
+    "docker:stop": "docker stop chacha && docker rm chacha",
+    "docker:logs": "docker logs -f chacha"
   },
   "dependencies": {
     "@google/genai": "^1.37.0",

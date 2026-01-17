@@ -15,6 +15,18 @@
     {
       "name": "DATABASE_PATH",
       "value": "/app/data/chacha.db"
+    },
+    {
+      "name": "STATIC_PATH",
+      "value": "/app/backend/frontend/dist"
+    },
+    {
+      "name": "CORS_ORIGIN",
+      "value": "*"
+    },
+    {
+      "name": "JWT_SECRET",
+      "value": "chacha-modelscope-secret-key-2024"
     }
   ]
 }

@@ -4,7 +4,22 @@
  */
 
 // API 基础地址
-const API_BASE_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:3001/api';
+// 生产环境使用相对路径（前后端同源），开发环境使用 localhost:3001
+const getApiBaseUrl = (): string => {
+  // 检查是否有环境变量指定
+  const envUrl = (import.meta as any).env?.VITE_API_URL;
+  if (envUrl) return envUrl;
+  
+  // 生产环境使用相对路径
+  if ((import.meta as any).env?.PROD) {
+    return '/api';
+  }
+  
+  // 开发环境使用本地后端
+  return 'http://localhost:3001/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // ==================== 类型定义 ====================
 

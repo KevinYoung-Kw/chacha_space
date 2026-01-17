@@ -78,13 +78,19 @@ app.get('/api/health-check', (req, res) => {
 if (config.nodeEnv === 'production') {
   const path = require('path');
   
+  // Docker 中静态文件路径: /app/backend/frontend/dist
+  // 或通过环境变量指定
+  const staticPath = process.env.STATIC_PATH || path.join(__dirname, '../frontend/dist');
+  
+  console.log(`[Static] 服务静态文件目录: ${staticPath}`);
+  
   // 服务前端静态文件
-  app.use(express.static(path.join(__dirname, '../../frontend/dist')));
+  app.use(express.static(staticPath));
   
   // 所有其他路由返回前端应用
   app.get('*', (req, res) => {
     if (!req.path.startsWith('/api')) {
-      res.sendFile(path.join(__dirname, '../../frontend/dist/index.html'));
+      res.sendFile(path.join(staticPath, 'index.html'));
     }
   });
 }

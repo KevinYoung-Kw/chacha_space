@@ -23,14 +23,17 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   isSpeaking = false
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [micError, setMicError] = useState<string>('');
   
   // 检查浏览器是否支持语音识别
   const isSupported = 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
 
-  // Auto scroll to bottom when new messages arrive
+  // Auto scroll the message container only (avoid page scroll)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
   }, [messages]);
 
   // 自动清除错误提示
@@ -95,7 +98,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         boxShadow: '0 4px 20px rgba(92, 77, 67, 0.08)'
       }}>
         {/* Dialog Display Area - Shows conversation with scrolling */}
-        <div className="px-5 py-4 max-h-[180px] min-h-[80px] overflow-y-auto border-b border-[#e6ddd0]/40 scrollbar-custom bg-transparent">
+        <div
+          ref={scrollContainerRef}
+          className="px-5 py-4 max-h-[180px] min-h-[80px] overflow-y-auto border-b border-[#e6ddd0]/40 scrollbar-custom bg-transparent"
+        >
           <div className="flex flex-col gap-3 text-sm">
             {messages.length === 0 ? (
               <div className="text-[#8b7b6d] text-center py-2 italic">

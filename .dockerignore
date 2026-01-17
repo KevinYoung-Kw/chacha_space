@@ -5,17 +5,16 @@ backend/node_modules
 # Build outputs
 dist
 backend/dist
-.vite
+
+# Data files
+*.db
+data/
 
 # Development files
-*.log
-.env
-.env.local
-.env.*.local
-
-# Git
 .git
 .gitignore
+*.md
+.env*
 
 # IDE
 .vscode
@@ -23,19 +22,16 @@ backend/dist
 *.swp
 *.swo
 
-# OS
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
 .DS_Store
 Thumbs.db
 
-# Test
+# Test files
+*.test.*
+*.spec.*
+__tests__
 coverage
-*.test.ts
-*.spec.ts
-
-# Documentation (optional - remove if you want docs in container)
-*.md
-!README.md
-
-# Temporary files
-tmp
-temp

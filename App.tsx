@@ -176,6 +176,7 @@ const App: React.FC = () => {
   // --- Refs ---
   const recognitionRef = useRef<any>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const currentAudioSourceRef = useRef<AudioBufferSourceNode | null>(null); // 当前播放的音频源
   const inputRef = useRef<HTMLInputElement>(null);
   const weatherFetchedRef = useRef<boolean>(false);
   const videoAvatarRef = useRef<VideoAvatarRef>(null);
@@ -254,8 +255,29 @@ const App: React.FC = () => {
     }
   };
 
+  // 停止当前播放的音频
+  const stopCurrentAudio = useCallback(() => {
+    // 停止 Web Audio API 音频
+    if (currentAudioSourceRef.current) {
+      try {
+        currentAudioSourceRef.current.stop();
+        currentAudioSourceRef.current.disconnect();
+      } catch (e) {
+        // 忽略已经停止的音频源错误
+      }
+      currentAudioSourceRef.current = null;
+    }
+    // 停止浏览器原生 TTS
+    if (window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+    }
+  }, []);
+
   const speak = async (text: string) => {
     try {
+      // 先停止之前正在播放的音频（打断功能）
+      stopCurrentAudio();
+      
       // 使用后端 TTS API
       const audioBufferData = await ttsApi.synthesize(text, currentVoiceId);
       
@@ -267,9 +289,12 @@ const App: React.FC = () => {
         if (ctx.state === 'suspended') await ctx.resume();
 
         const buffer = await decodeAudioData(audioBufferData, ctx);
-        playAudioBuffer(buffer, ctx, () => {
+        const source = playAudioBuffer(buffer, ctx, () => {
+            currentAudioSourceRef.current = null;
             setState(AssistantState.IDLE);
         });
+        // 保存当前音频源引用，以便后续可以停止
+        currentAudioSourceRef.current = source;
       } else {
         // Fallback to browser TTS
         const utterance = new SpeechSynthesisUtterance(text);
@@ -278,12 +303,16 @@ const App: React.FC = () => {
         window.speechSynthesis.speak(utterance);
       }
     } catch (e) {
+      currentAudioSourceRef.current = null;
       setState(AssistantState.IDLE);
     }
   };
 
   // --- 发送消息到后端 ---
   const processInput = async (text: string) => {
+    // 立即停止当前正在播放的音频（用户打断）
+    stopCurrentAudio();
+    
     addMessage('user', text);
     setState(AssistantState.THINKING);
     
@@ -738,7 +767,10 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 bg-[#fdfcf8] text-[#5c4d43] font-sans overflow-hidden selection:bg-[#e6dec8]">
+    <div
+      className="fixed inset-0 w-screen h-screen bg-[#fdfcf8] text-[#5c4d43] font-sans overflow-hidden selection:bg-[#e6dec8]"
+      style={{ height: '100dvh', width: '100vw' }}
+    >
         {/* Background Image */}
         <div 
           className="absolute inset-0 pointer-events-none"
