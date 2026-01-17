@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "叉叉 AI 虚拟助手 - 来自 2045 年的贴心伙伴",
+  "description": "叉叉 AI 虚拟助手 - 你的贴心伙伴",
   "scripts": {
     "dev": "vite",
     "dev:backend": "cd backend && npm run dev",

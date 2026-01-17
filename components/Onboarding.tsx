@@ -53,7 +53,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
             </div>
             <div>
                 <h1 className="text-3xl font-bold text-gray-800 tracking-tight">嗨，我是叉叉 ✨</h1>
-                <p className="text-gray-500 mt-3 text-lg font-medium">来自2045年的AI极简主义整理师</p>
+                <p className="text-gray-500 mt-3 text-lg font-medium">你的AI极简主义整理师</p>
             </div>
             <div className="bg-white/50 backdrop-blur-sm p-4 rounded-2xl border border-white/60 text-sm text-gray-500 w-full max-w-xs text-left shadow-sm">
               <p className="mb-2 font-bold text-gray-700">即将开启的功能：</p>

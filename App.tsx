@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { AssistantState, Message, TodoItem, TodoCategory, WeatherData, TarotResult, WaterRecord, CalorieRecord, SleepRecord, ExerciseRecord, AffinityData, AffinityEvent } from './types';
 import VideoAvatar, { VideoAvatarRef } from './components/VideoAvatar';
 import ChatInterface from './components/ChatInterface';
-import AuthScreen from './components/AuthScreen';
+import NicknameSetup from './components/NicknameSetup';
 import WeatherPanel from './components/tools/WeatherPanel';
 import DivinationPanel from './components/tools/DivinationPanel';
 import HealthPanel from './components/tools/HealthPanel';
@@ -22,10 +22,10 @@ import { api, authApi, chatApi, categoryApi, healthApi, todoApi, weatherApi, tts
 import { decodeAudioData, playAudioBuffer } from './services/audioService';
 import { loadAffinityData, updateAffinity, getAffinityLevel, saveAffinityData } from './services/affinityService';
 // 记忆功能已由后端AI自动处理，前端不再主动生成记忆
-import { CloudSun, Sparkles, Mic2, Activity, CheckSquare, Zap, ChevronUp, ChevronDown, LogOut, Film, Brain } from 'lucide-react';
+import { CloudSun, Sparkles, Mic2, Activity, CheckSquare, Zap, ChevronUp, ChevronDown, LogOut, Film, Brain, Music, VolumeX } from 'lucide-react';
 
 // Panel Types - 统一管理，所有面板都在右侧显示
-type ActivePanelType = 'none' | 'weather' | 'fortune' | 'health' | 'todo' | 'skills' | 'memory' | 'watcha' | 'animation' | 'affinity';
+type ActivePanelType = 'none' | 'bgm' | 'weather' | 'fortune' | 'health' | 'todo' | 'skills' | 'memory' | 'watcha' | 'animation' | 'affinity';
 
 // 用户信息类型
 interface UserProfile {
@@ -41,6 +41,7 @@ const App: React.FC = () => {
   // --- 认证状态 ---
   const [user, setUser] = useState<UserProfile | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [needsNickname, setNeedsNickname] = useState(false);
   
   // Panel States - 统一管理
   const [activePanel, setActivePanel] = useState<ActivePanelType>('none');
@@ -181,23 +182,140 @@ const App: React.FC = () => {
   const weatherFetchedRef = useRef<boolean>(false);
   const videoAvatarRef = useRef<VideoAvatarRef>(null);
   const videoErrorCountRef = useRef<number>(0);
+  const clickCountRef = useRef<number>(0);
+  const lastClickTimeRef = useRef<number>(0);
+  const bgmAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // BGM 播放状态
+  const [isBgmPlaying, setIsBgmPlaying] = useState<boolean>(false);
+
+  // 初始化 BGM
+  useEffect(() => {
+    if (!bgmAudioRef.current) {
+      const audio = new Audio('/bgm/Nintendo Sound Team - Welcome Horizons.mp3');
+      audio.loop = true;
+      audio.volume = 0.15; // 设置音量为15%
+      bgmAudioRef.current = audio;
+    }
+
+    return () => {
+      if (bgmAudioRef.current) {
+        bgmAudioRef.current.pause();
+        bgmAudioRef.current = null;
+      }
+    };
+  }, []);
+
+  // 音量淡入淡出函数
+  const fadeVolume = useCallback((targetVolume: number, duration: number = 500) => {
+    const audio = bgmAudioRef.current;
+    if (!audio) return;
+
+    const startVolume = audio.volume;
+    const volumeDiff = targetVolume - startVolume;
+    const steps = 20;
+    const stepDuration = duration / steps;
+    let currentStep = 0;
+
+    const fadeInterval = setInterval(() => {
+      currentStep++;
+      if (currentStep >= steps) {
+        audio.volume = targetVolume;
+        clearInterval(fadeInterval);
+      } else {
+        audio.volume = startVolume + (volumeDiff * currentStep / steps);
+      }
+    }, stepDuration);
+  }, []);
+
+  // 监听叉叉说话状态，自动调整 BGM 音量
+  useEffect(() => {
+    if (!isBgmPlaying) return;
+
+    if (state === AssistantState.SPEAKING) {
+      // 叉叉开始说话，降低音量到 5%
+      fadeVolume(0.05, 300);
+    } else {
+      // 叉叉说话结束，恢复音量到 15%
+      fadeVolume(0.15, 500);
+    }
+  }, [state, isBgmPlaying, fadeVolume]);
+
+  // 切换 BGM 播放状态
+  const toggleBgm = useCallback(() => {
+    if (!bgmAudioRef.current) return;
+
+    if (isBgmPlaying) {
+      bgmAudioRef.current.pause();
+      setIsBgmPlaying(false);
+    } else {
+      bgmAudioRef.current.play().catch((err) => {
+        console.error('BGM 播放失败:', err);
+      });
+      setIsBgmPlaying(true);
+    }
+  }, [isBgmPlaying]);
+
+  // 点击叉叉的互动
+  const handleAvatarClick = useCallback(async () => {
+    const now = Date.now();
+    
+    // 重置点击计数（如果距离上次点击超过5秒）
+    if (now - lastClickTimeRef.current > 5000) {
+      clickCountRef.current = 0;
+    }
+    
+    lastClickTimeRef.current = now;
+    clickCountRef.current += 1;
+    
+    // 根据点击次数选择不同的动画和语音
+    const interactionMap = [
+      { animation: 'happy', text: '嗨嗨，我在这儿呢' },
+      { animation: 'wave', text: '怎么啦' },
+      { animation: 'excited', text: '有什么想聊的吗' },
+      { animation: 'jump', text: '我超开心的' },
+      { animation: 'shy', text: '别一直戳我啦' },
+      { animation: 'disapprove', text: '够了够了，我很忙的' },
+    ];
+    
+    const index = Math.min(clickCountRef.current - 1, interactionMap.length - 1);
+    const interaction = interactionMap[index];
+    
+    // 播放动画
+    if (videoAvatarRef.current) {
+      videoAvatarRef.current.playAction(interaction.animation);
+      videoAvatarRef.current.resetActivityTimer();
+    }
+    
+    // 播放语音
+    try {
+      if (audioContextRef.current) {
+        const audioData = await api.tts.synthesize(interaction.text);
+        if (audioData) {
+          const audioBuffer = await decodeAudioData(audioData, audioContextRef.current);
+          playAudioBuffer(audioBuffer, audioContextRef.current);
+        }
+      }
+    } catch (err) {
+      console.error('点击互动 TTS 失败:', err);
+    }
+  }, []);
 
   // --- 检查认证状态 ---
   useEffect(() => {
     const checkAuth = async () => {
-      if (authApi.isAuthenticated()) {
-        const storedUser = authApi.getStoredUser();
-        if (storedUser) {
-          setUser(storedUser);
+      // 使用快速登录（基于设备ID）
+      const result = await authApi.quickLogin();
+      
+      if (result.success && result.data) {
+        setUser(result.data.user);
+        
+        // 检查是否需要设置昵称
+        if (result.data.needsNickname) {
+          setNeedsNickname(true);
+        } else {
           // 加载用户数据
           loadUserData();
-        } else {
-          // Token 存在但没有用户信息，尝试获取
-          const result = await authApi.getProfile();
-          if (result.success && result.data) {
-            setUser(result.data);
-            loadUserData();
-          }
         }
       }
       setAuthChecked(true);
@@ -205,8 +323,15 @@ const App: React.FC = () => {
     checkAuth();
 
     // 监听未授权事件
-    const handleUnauthorized = () => {
-      setUser(null);
+    const handleUnauthorized = async () => {
+      // 重新尝试快速登录
+      const result = await authApi.quickLogin();
+      if (result.success && result.data) {
+        setUser(result.data.user);
+        if (result.data.needsNickname) {
+          setNeedsNickname(true);
+        }
+      }
     };
     window.addEventListener('auth:unauthorized', handleUnauthorized);
     return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
@@ -665,14 +790,18 @@ const App: React.FC = () => {
     }
   }, [state]);
 
-  // --- 登录成功回调 ---
-  const handleAuthSuccess = (userData: UserProfile) => {
-    setUser(userData);
+  // --- 昵称设置完成回调 ---
+  const handleNicknameComplete = (nickname: string) => {
+    // 更新用户信息
+    setUser(prev => prev ? { ...prev, name: nickname } : null);
+    setNeedsNickname(false);
+    // 加载用户数据
     loadUserData();
     // 欢迎消息
-    const intro = `嗨！${userData.name}，很高兴遇见你！我是叉叉，来自2045年的你亲手创造的AI助手～让我们一起把生活整理得井井有条吧！`;
+    const intro = `欢迎来到我的小小空间～我是叉叉，你的AI助手～让我们一起把生活整理得井井有条吧！`;
     addMessage('assistant', intro);
     speak(intro);
+    videoAvatarRef.current?.playAction('wave');
   };
 
   // --- 等待认证检查完成 ---
@@ -684,9 +813,26 @@ const App: React.FC = () => {
     );
   }
 
-  // --- 未登录显示登录页面 ---
+  // --- 需要设置昵称 ---
+  if (needsNickname) {
+    return <NicknameSetup onComplete={handleNicknameComplete} />;
+  }
+
+  // --- 用户未正常加载（极端情况）---
   if (!user) {
-    return <AuthScreen onAuthSuccess={handleAuthSuccess} />;
+    return (
+      <div className="min-h-screen bg-[#fdfcf8] flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-pulse text-[#8b7b6d] mb-4">连接中...</div>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+          >
+            重新加载
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // 判断是否有面板打开
@@ -825,6 +971,8 @@ const App: React.FC = () => {
               affinity={affinity}
               setAffinity={setAffinity}
               isMobile={false}
+              isBgmPlaying={isBgmPlaying}
+              onToggleBgm={toggleBgm}
             />
           </div>
 
@@ -881,13 +1029,19 @@ const App: React.FC = () => {
                 transformOrigin: 'center center'
               }}
             >
-                  <VideoAvatar 
-                    ref={videoAvatarRef}
-                    config={characterConfig}
-                    className="h-full w-full"
-                    autoPlay={true}
-                    debug={false}
-                  />
+                  <div 
+                    className="h-full w-full cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-transform duration-200"
+                    onClick={handleAvatarClick}
+                    title="点击和叉叉互动"
+                  >
+                    <VideoAvatar 
+                      ref={videoAvatarRef}
+                      config={characterConfig}
+                      className="h-full w-full"
+                      autoPlay={true}
+                      debug={false}
+                    />
+                  </div>
 
                   {/* 好感度变化提示 - 字幕风格，位于叉叉中间区域 */}
                   {affinityToast && (
@@ -993,6 +1147,8 @@ interface ToolbarProps {
   affinity: AffinityData;
   setAffinity: (affinity: AffinityData) => void;
   isMobile?: boolean;
+  isBgmPlaying?: boolean;
+  onToggleBgm?: () => void;
 }
 
 // 手机端底部工具栏
@@ -1076,7 +1232,9 @@ const ScrollableToolbar: React.FC<ToolbarProps> = ({
   videoAvatarRef,
   affinity,
   setAffinity,
-  isMobile = false
+  isMobile = false,
+  isBgmPlaying = false,
+  onToggleBgm
 }) => {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const toolRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -1130,6 +1288,14 @@ const ScrollableToolbar: React.FC<ToolbarProps> = ({
   };
 
   const togglePanel = (panel: ActivePanelType) => {
+    // BGM 按钮特殊处理 - 不触发面板，只切换音乐
+      if (panel === 'bgm') {
+      if (onToggleBgm) {
+        onToggleBgm();
+      }
+      return;
+    }
+    
     const newState = activePanel === panel ? 'none' : panel;
     setActivePanel(newState);
     
@@ -1158,6 +1324,13 @@ const ScrollableToolbar: React.FC<ToolbarProps> = ({
   const affinityLevelNum = parseInt(affinity.level.replace('v', '')) || 1;
 
   const tools = [
+    // BGM 按钮 - 放在最前面
+    { 
+      id: 'bgm' as const, 
+      icon: isBgmPlaying ? <Music size={22} /> : <VolumeX size={22} />, 
+      label: '音乐',
+      isBgmButton: true
+    },
     { id: 'health' as const, icon: <Activity size={22} />, label: '健康' },
     { id: 'weather' as const, icon: <CloudSun size={22} />, label: '天气' },
     { id: 'fortune' as const, icon: <Sparkles size={22} />, label: '占卜' },
@@ -1205,6 +1378,10 @@ const ScrollableToolbar: React.FC<ToolbarProps> = ({
       >
         {tools.map((tool) => {
           const isLocked = tool.requiredLevel ? affinityLevelNum < tool.requiredLevel : false;
+          const isBgmTool = (tool as any).isBgmButton;
+          // BGM 按钮不参与面板激活状态，只显示播放状态
+          const isActive = isBgmTool ? isBgmPlaying : activePanel === tool.id;
+          
           return (
             <div 
               key={tool.id} 
@@ -1213,7 +1390,7 @@ const ScrollableToolbar: React.FC<ToolbarProps> = ({
             >
               <ToolbarIcon
                 icon={tool.icon}
-                active={activePanel === tool.id}
+                active={isActive}
                 onClick={() => togglePanel(tool.id)}
                 label={tool.label}
                 notification={tool.notification}

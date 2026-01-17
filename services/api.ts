@@ -43,6 +43,8 @@ interface AuthResponse {
   token: string;
   user: UserProfile;
   sessionId: string;
+  isNewUser?: boolean;
+  needsNickname?: boolean;
 }
 
 interface ChatResponse {
@@ -176,9 +178,66 @@ async function request<T>(
 
 // ==================== 认证 API ====================
 
+// 设备ID管理
+function getOrCreateDeviceId(): string {
+  let deviceId = localStorage.getItem('chacha_device_id');
+  if (!deviceId) {
+    // 生成唯一设备ID
+    deviceId = `device_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    localStorage.setItem('chacha_device_id', deviceId);
+  }
+  return deviceId;
+}
+
 export const authApi = {
   /**
-   * 用户注册
+   * 快速登录（基于设备ID，无需注册）
+   */
+  async quickLogin(): Promise<ApiResponse<AuthResponse>> {
+    const deviceId = getOrCreateDeviceId();
+    const result = await request<AuthResponse>('/auth/quick-login', {
+      method: 'POST',
+      body: JSON.stringify({ deviceId }),
+    });
+    
+    if (result.success && result.data) {
+      setAuthToken(result.data.token);
+      localStorage.setItem('chacha_user', JSON.stringify(result.data.user));
+      localStorage.setItem('chacha_session', result.data.sessionId);
+    }
+    
+    return result;
+  },
+
+  /**
+   * 检查昵称是否可用
+   */
+  async checkNickname(nickname: string): Promise<ApiResponse<{ available: boolean; nickname: string }>> {
+    return request<{ available: boolean; nickname: string }>('/auth/check-nickname', {
+      method: 'POST',
+      body: JSON.stringify({ nickname }),
+    });
+  },
+
+  /**
+   * 设置昵称
+   */
+  async setNickname(nickname: string): Promise<ApiResponse<UserProfile>> {
+    const result = await request<UserProfile>('/auth/set-nickname', {
+      method: 'POST',
+      body: JSON.stringify({ nickname }),
+    });
+    
+    if (result.success && result.data) {
+      // 更新本地存储的用户信息
+      localStorage.setItem('chacha_user', JSON.stringify(result.data));
+    }
+    
+    return result;
+  },
+
+  /**
+   * 用户注册（保留旧接口）
    */
   async register(data: {
     email: string;
@@ -203,7 +262,7 @@ export const authApi = {
   },
 
   /**
-   * 用户登录
+   * 用户登录（保留旧接口）
    */
   async login(email: string, password: string): Promise<ApiResponse<AuthResponse>> {
     const result = await request<AuthResponse>('/auth/login', {
