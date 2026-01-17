@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { ToggleLeft, ToggleRight, Zap, Star, Activity, Coffee, Mic, Music } from 'lucide-react';
+import { ToggleLeft, ToggleRight, Zap, Star, Activity, Coffee, Music, Mic } from 'lucide-react';
 
 const SkillsPanel: React.FC = () => {
     const [skills, setSkills] = useState([
@@ -16,53 +16,64 @@ const SkillsPanel: React.FC = () => {
     };
 
     return (
-        <div className="h-full flex flex-col font-sans text-gray-700">
+        <div className="h-full flex flex-col bg-[var(--color-bg-warm)] font-sans">
              {/* Header */}
-             <div className="p-6 pb-2">
-                <h2 className="text-2xl font-bold flex items-center gap-2 text-gray-800">
-                    <Zap className="text-purple-500 fill-purple-100" /> 
-                    能力开关
-                </h2>
-                <p className="text-xs text-gray-500 mt-1 pl-1">自定义塔塔的助手技能</p>
+             <div className="px-6 pt-6 pb-4">
+                <div className="flex items-center gap-3 mb-1">
+                    <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                        <Zap className="text-purple-500" size={20} />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-bold text-[var(--color-text-primary)]">能力开关</h2>
+                        <p className="text-xs text-[var(--color-text-muted)]">自定义塔塔的助手技能</p>
+                    </div>
+                </div>
              </div>
 
              {/* Skills List */}
-             <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pb-6 space-y-4">
+             <div className="flex-1 overflow-y-auto custom-scrollbar px-6 pb-6 space-y-3">
                 {skills.map(skill => (
                     <div 
                         key={skill.id} 
                         onClick={() => toggle(skill.id)}
-                        className={`group p-4 rounded-2xl border transition-all duration-300 cursor-pointer flex items-center justify-between
+                        className={`p-4 rounded-2xl border transition-colors cursor-pointer flex items-center justify-between
                             ${skill.active 
-                                ? 'bg-white/80 border-purple-200 shadow-md shadow-purple-100/50' 
-                                : 'bg-white/40 border-white/50 hover:bg-white/60'}`}
+                                ? 'bg-white/80 border-purple-200' 
+                                : 'bg-white/40 border-[var(--color-border-subtle)] hover:bg-white/60'}`}
                     >
-                        <div className="flex items-center gap-4">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${skill.active ? 'bg-purple-500 text-white' : 'bg-gray-100 text-gray-400'}`}>
+                        <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors 
+                                ${skill.active ? 'bg-purple-500 text-white' : 'bg-[var(--color-bg-accent)] text-[var(--color-text-muted)]'}`}
+                            >
                                 {skill.icon}
                             </div>
                             <div>
-                                <h3 className={`font-bold text-sm ${skill.active ? 'text-gray-800' : 'text-gray-500'}`}>{skill.name}</h3>
-                                <p className="text-[10px] text-gray-400 font-medium">{skill.desc}</p>
+                                <h3 className={`font-semibold text-sm ${skill.active ? 'text-[var(--color-text-primary)]' : 'text-[var(--color-text-secondary)]'}`}>
+                                    {skill.name}
+                                </h3>
+                                <p className="text-[11px] text-[var(--color-text-muted)]">{skill.desc}</p>
                             </div>
                         </div>
                         
-                        <div className={`transition-colors ${skill.active ? 'text-purple-500' : 'text-gray-300'}`}>
-                            {skill.active ? <ToggleRight size={32} /> : <ToggleLeft size={32} />}
+                        <div className={`transition-colors ${skill.active ? 'text-purple-500' : 'text-[var(--color-text-muted)]'}`}>
+                            {skill.active ? <ToggleRight size={28} /> : <ToggleLeft size={28} />}
                         </div>
                     </div>
                 ))}
              </div>
              
              {/* Footer Prompt */}
-             <div className="p-6 pt-2">
-                <div className="bg-gradient-to-r from-violet-600 to-indigo-600 rounded-2xl p-4 text-white shadow-lg relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-16 h-16 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-xl"></div>
-                    <div className="flex items-start gap-3 relative z-10">
-                        <Mic size={20} className="mt-1 opacity-80"/>
+             <div className="px-6 pb-6">
+                <div className="bg-white/60 border border-[var(--color-border-subtle)] rounded-2xl p-4">
+                    <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 bg-[var(--color-bg-accent)] rounded-lg flex items-center justify-center flex-shrink-0">
+                            <Mic size={16} className="text-[var(--color-text-secondary)]"/>
+                        </div>
                         <div>
-                            <p className="text-xs font-bold opacity-80 uppercase mb-1">想学新技能？</p>
-                            <p className="text-sm font-medium">试着对我说：<br/>"记住，我想让你每天提醒我..."</p>
+                            <p className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide mb-1">想学新技能？</p>
+                            <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed">
+                                试着对我说："记住，我想让你每天提醒我..."
+                            </p>
                         </div>
                     </div>
                 </div>

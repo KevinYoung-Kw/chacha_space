@@ -8,6 +8,7 @@
 import React, { useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
 import { useCharacterStateMachine, StateUtils } from '../hooks/useCharacterStateMachine';
 import { VideoStateID, StateChangeEvent, StateMachineConfig } from '../services/characterStateMachine';
+import { Smile, RefreshCw, Sparkles, Drama } from 'lucide-react';
 
 // ==================== 类型定义 ====================
 
@@ -92,15 +93,15 @@ const VideoAvatar = forwardRef<VideoAvatarRef, VideoAvatarProps>((props, ref) =>
   // 状态指示器样式
   const getStateIndicator = useCallback(() => {
     if (StateUtils.isIdle(currentState)) {
-      return { emoji: '😊', label: '待机中' };
+      return { icon: <Smile size={18} className="text-green-400" />, label: '待机中' };
     }
     if (StateUtils.isTransition(currentState)) {
-      return { emoji: '🔄', label: '切换中' };
+      return { icon: <RefreshCw size={18} className="text-blue-400 animate-spin" />, label: '切换中' };
     }
     if (StateUtils.isAction(currentState)) {
-      return { emoji: '✨', label: '执行动作' };
+      return { icon: <Sparkles size={18} className="text-yellow-400 animate-pulse" />, label: '执行动作' };
     }
-    return { emoji: '🎭', label: currentState };
+    return { icon: <Drama size={18} className="text-purple-400" />, label: currentState };
   }, [currentState]);
 
   const indicator = getStateIndicator();
@@ -138,7 +139,7 @@ const VideoAvatar = forwardRef<VideoAvatarRef, VideoAvatarProps>((props, ref) =>
       {debug && (
         <div className="absolute top-4 left-4 bg-black/70 backdrop-blur-sm text-white text-xs px-3 py-2 rounded-lg font-mono z-50">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-lg">{indicator.emoji}</span>
+            {indicator.icon}
             <span className="text-purple-300">{indicator.label}</span>
           </div>
           <div className="text-gray-400">State: {currentState}</div>
@@ -149,7 +150,7 @@ const VideoAvatar = forwardRef<VideoAvatarRef, VideoAvatarProps>((props, ref) =>
       {/* 状态气泡（可选，用于生产环境的轻量提示） */}
       {isInitialized && StateUtils.isAction(currentState) && (
         <div className="absolute top-4 right-4 bg-white/90 backdrop-blur rounded-full px-4 py-2 shadow-lg animate-bounce z-40">
-          <span className="text-lg">{indicator.emoji}</span>
+          {indicator.icon}
         </div>
       )}
 

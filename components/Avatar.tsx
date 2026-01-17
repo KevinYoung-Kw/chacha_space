@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { AssistantState } from '../types';
+import { Volume2, Cloud, Sparkles, Ear } from 'lucide-react';
 
 interface AvatarProps {
   state: AssistantState;
@@ -22,12 +23,12 @@ const Avatar: React.FC<AvatarProps> = ({ state, className, mode = 'full' }) => {
       }
   };
 
-  const getEmoji = () => {
+  const getStateIcon = () => {
     switch (state) {
-      case AssistantState.SPEAKING: return '🗣️';
-      case AssistantState.THINKING: return '💭';
-      case AssistantState.HAPPY: return '✨';
-      case AssistantState.LISTENING: return '👂';
+      case AssistantState.SPEAKING: return <Volume2 size={20} className="text-purple-500 animate-pulse" />;
+      case AssistantState.THINKING: return <Cloud size={20} className="text-blue-400 animate-bounce" />;
+      case AssistantState.HAPPY: return <Sparkles size={20} className="text-yellow-400 animate-spin" />;
+      case AssistantState.LISTENING: return <Ear size={20} className="text-green-400" />;
       default: return null;
     }
   };
@@ -69,10 +70,10 @@ const Avatar: React.FC<AvatarProps> = ({ state, className, mode = 'full' }) => {
                   className={`max-h-full max-w-full object-contain drop-shadow-2xl z-10 ${getImageStyle()}`}
               />
               
-              {/* Optional Status Emoji Bubble near head */}
-              {getEmoji() && (
-                  <div className="absolute top-10 right-1/3 bg-white/80 backdrop-blur rounded-full w-10 h-10 flex items-center justify-center text-xl shadow-sm animate-bounce z-20">
-                      {getEmoji()}
+              {/* Optional Status Icon Bubble near head */}
+              {getStateIcon() && (
+                  <div className="absolute top-10 right-1/3 bg-white/80 backdrop-blur rounded-full w-10 h-10 flex items-center justify-center shadow-sm z-20">
+                      {getStateIcon()}
                   </div>
               )}
           </div>

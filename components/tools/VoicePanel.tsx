@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic2, Play, Square, Wand2, Sparkles, Check, Loader2, Music2, User, Plus, Trash2, Search } from 'lucide-react';
+import { Play, Square, Wand2, Sparkles, Check, Loader2, Music2, User, Plus, Trash2, Search } from 'lucide-react';
 import { designVoice } from '../../services/minimaxService';
 import { decodeAudioData, playAudioBuffer } from '../../services/audioService';
 import { Voice } from '../../types';
@@ -132,7 +132,7 @@ const VoicePanel: React.FC<VoicePanelProps> = ({ currentVoiceId, onVoiceSelected
             saveCustomVoice(newVoice);
             onVoiceSelected(generatedVoiceId);
             setGeneratedVoiceId(null);
-            setActiveTab('custom'); // Ensure we are on the custom tab to see the list
+            setActiveTab('custom');
         }
     };
 
@@ -142,23 +142,30 @@ const VoicePanel: React.FC<VoicePanelProps> = ({ currentVoiceId, onVoiceSelected
     );
 
     return (
-        <div className="h-full flex flex-col font-sans text-gray-700 bg-white/40">
+        <div className="h-full flex flex-col bg-[var(--color-bg-warm)] font-sans">
             {/* Header */}
-            <div className="p-6 pb-2">
-                <h2 className="text-2xl font-bold flex items-center gap-2 text-gray-800">
-                    <Music2 className="text-pink-500 fill-pink-100" />
-                    音色工坊
-                </h2>
-                <div className="flex bg-white/50 p-1 rounded-xl mt-4 border border-white/60 shadow-inner">
+            <div className="px-6 pt-6 pb-4">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 bg-pink-100 rounded-xl flex items-center justify-center">
+                        <Music2 className="text-pink-500" size={20} />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-bold text-[var(--color-text-primary)]">音色工坊</h2>
+                        <p className="text-xs text-[var(--color-text-muted)]">选择或创建专属音色</p>
+                    </div>
+                </div>
+                
+                {/* Tab Switcher */}
+                <div className="flex bg-[var(--color-bg-accent)] p-1 rounded-xl">
                     <button 
                         onClick={() => setActiveTab('preset')}
-                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'preset' ? 'bg-white shadow-sm text-pink-600' : 'text-gray-500 hover:text-gray-700'}`}
+                        className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-colors ${activeTab === 'preset' ? 'bg-white text-pink-600' : 'text-[var(--color-text-muted)]'}`}
                     >
                         内置音色
                     </button>
                     <button 
                         onClick={() => setActiveTab('custom')}
-                        className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${activeTab === 'custom' ? 'bg-white shadow-sm text-pink-600' : 'text-gray-500 hover:text-gray-700'}`}
+                        className={`flex-1 py-2 text-xs font-semibold rounded-lg transition-colors ${activeTab === 'custom' ? 'bg-white text-pink-600' : 'text-[var(--color-text-muted)]'}`}
                     >
                         自定义
                     </button>
@@ -173,32 +180,41 @@ const VoicePanel: React.FC<VoicePanelProps> = ({ currentVoiceId, onVoiceSelected
                     <div className="space-y-4">
                         {/* Search */}
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16}/>
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" size={16}/>
                             <input 
                                 type="text" 
                                 placeholder="搜索音色..." 
-                                className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-white/60 border border-white/50 text-sm focus:outline-none focus:ring-2 focus:ring-pink-100"
+                                className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-white/60 border border-[var(--color-border-subtle)] text-sm focus:outline-none focus:border-pink-300 transition-colors"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 gap-2">
+                        <div className="space-y-2">
                             {filteredPresetVoices.map(voice => (
                                 <div 
                                     key={voice.id}
                                     onClick={() => onVoiceSelected(voice.id)}
-                                    className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${currentVoiceId === voice.id ? 'bg-pink-50 border-pink-200 shadow-sm' : 'bg-white/40 border-transparent hover:bg-white/80'}`}
+                                    className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors 
+                                        ${currentVoiceId === voice.id 
+                                            ? 'bg-pink-50 border-pink-200' 
+                                            : 'bg-white/40 border-[var(--color-border-subtle)] hover:bg-white/60'}`}
                                 >
                                     <div className="flex items-center gap-3">
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${currentVoiceId === voice.id ? 'bg-pink-500 text-white' : 'bg-gray-200 text-gray-500'}`}>
+                                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-xs font-bold 
+                                            ${currentVoiceId === voice.id ? 'bg-pink-500 text-white' : 'bg-[var(--color-bg-accent)] text-[var(--color-text-muted)]'}`}
+                                        >
                                             {voice.name[0]}
                                         </div>
                                         <div>
-                                            <p className={`text-sm font-bold ${currentVoiceId === voice.id ? 'text-pink-700' : 'text-gray-700'}`}>{voice.name}</p>
+                                            <p className={`text-sm font-semibold ${currentVoiceId === voice.id ? 'text-pink-700' : 'text-[var(--color-text-primary)]'}`}>
+                                                {voice.name}
+                                            </p>
                                             <div className="flex gap-1 mt-0.5">
-                                                {voice.tags?.slice(0, 3).map(tag => (
-                                                    <span key={tag} className="text-[10px] px-1.5 py-0.5 bg-gray-100 rounded text-gray-500">{tag}</span>
+                                                {voice.tags?.slice(0, 2).map(tag => (
+                                                    <span key={tag} className="text-[10px] px-1.5 py-0.5 bg-[var(--color-bg-accent)] rounded text-[var(--color-text-muted)]">
+                                                        {tag}
+                                                    </span>
                                                 ))}
                                             </div>
                                         </div>
@@ -212,28 +228,33 @@ const VoicePanel: React.FC<VoicePanelProps> = ({ currentVoiceId, onVoiceSelected
 
                 {/* --- Custom Tab --- */}
                 {activeTab === 'custom' && (
-                    <div className="space-y-6">
+                    <div className="space-y-5">
                         {/* Saved Custom Voices */}
                         {customVoices.length > 0 && (
                              <div className="space-y-2">
-                                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">我的音色库</h3>
+                                <h3 className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wide px-1">我的音色库</h3>
                                 {customVoices.map(voice => (
                                     <div 
                                         key={voice.id}
                                         onClick={() => onVoiceSelected(voice.id)}
-                                        className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all group ${currentVoiceId === voice.id ? 'bg-pink-50 border-pink-200 shadow-sm' : 'bg-white/40 border-transparent hover:bg-white/80'}`}
+                                        className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-colors group
+                                            ${currentVoiceId === voice.id 
+                                                ? 'bg-pink-50 border-pink-200' 
+                                                : 'bg-white/40 border-[var(--color-border-subtle)] hover:bg-white/60'}`}
                                     >
                                         <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center text-white">
+                                            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-indigo-400 to-purple-400 flex items-center justify-center text-white">
                                                 <User size={14}/>
                                             </div>
-                                            <p className={`text-sm font-bold ${currentVoiceId === voice.id ? 'text-pink-700' : 'text-gray-700'}`}>{voice.name}</p>
+                                            <p className={`text-sm font-semibold ${currentVoiceId === voice.id ? 'text-pink-700' : 'text-[var(--color-text-primary)]'}`}>
+                                                {voice.name}
+                                            </p>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             {currentVoiceId === voice.id && <Check size={16} className="text-pink-500"/>}
                                             <button 
                                                 onClick={(e) => deleteCustomVoice(voice.id, e)}
-                                                className="p-1.5 hover:bg-red-100 rounded text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                className="p-1.5 hover:bg-rose-100 rounded text-[var(--color-text-muted)] hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
                                             >
                                                 <Trash2 size={14}/>
                                             </button>
@@ -244,25 +265,25 @@ const VoicePanel: React.FC<VoicePanelProps> = ({ currentVoiceId, onVoiceSelected
                         )}
 
                         {/* Design Tool */}
-                        <div className="bg-white/60 rounded-2xl p-4 border border-white/50 shadow-sm">
-                            <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
+                        <div className="bg-white/60 border border-[var(--color-border-subtle)] rounded-2xl p-4">
+                            <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-4 flex items-center gap-2">
                                 <Wand2 size={16} className="text-purple-500"/> 设计新音色
                             </h3>
                             
                             <div className="space-y-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase">Prompt 描述</label>
+                                    <label className="text-xs font-medium text-[var(--color-text-muted)]">Prompt 描述</label>
                                     <textarea 
-                                        className="w-full h-24 p-3 rounded-xl bg-white border border-gray-100 focus:border-pink-300 focus:ring-2 focus:ring-pink-100 outline-none text-xs resize-none transition-all"
+                                        className="w-full h-24 p-3 rounded-xl bg-white border border-[var(--color-border-subtle)] focus:border-pink-300 outline-none text-xs resize-none transition-colors"
                                         placeholder="例如：声音低沉富有磁性的中年男性，语气稳重..."
                                         value={prompt}
                                         onChange={(e) => setPrompt(e.target.value)}
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold text-gray-400 uppercase">试听文本</label>
+                                    <label className="text-xs font-medium text-[var(--color-text-muted)]">试听文本</label>
                                     <input 
-                                        className="w-full p-3 rounded-xl bg-white border border-gray-100 focus:border-pink-300 focus:ring-2 focus:ring-pink-100 outline-none text-xs"
+                                        className="w-full p-3 rounded-xl bg-white border border-[var(--color-border-subtle)] focus:border-pink-300 outline-none text-xs transition-colors"
                                         value={previewText}
                                         onChange={(e) => setPreviewText(e.target.value)}
                                     />
@@ -271,8 +292,8 @@ const VoicePanel: React.FC<VoicePanelProps> = ({ currentVoiceId, onVoiceSelected
                                 <button 
                                     onClick={handleGenerate}
                                     disabled={isGenerating || !prompt}
-                                    className={`w-full py-3 rounded-xl font-bold text-white shadow-md transition-all flex items-center justify-center gap-2 text-sm
-                                        ${isGenerating ? 'bg-gray-400 cursor-not-allowed' : 'bg-gray-900 hover:bg-gray-800 hover:-translate-y-0.5'}`}
+                                    className={`w-full py-3 rounded-xl font-semibold text-white transition-colors flex items-center justify-center gap-2 text-sm
+                                        ${isGenerating ? 'bg-gray-400 cursor-not-allowed' : 'bg-[var(--color-text-primary)] hover:opacity-90'}`}
                                 >
                                     {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
                                     {isGenerating ? '正在生成...' : '生成试听'}
@@ -281,18 +302,18 @@ const VoicePanel: React.FC<VoicePanelProps> = ({ currentVoiceId, onVoiceSelected
 
                             {/* Result Actions */}
                             {generatedVoiceId && (
-                                <div className="mt-4 pt-4 border-t border-dashed border-gray-300 animate-fade-in-up">
+                                <div className="mt-4 pt-4 border-t border-[var(--color-border-subtle)]">
                                     <div className="flex gap-2">
                                         <button 
                                             onClick={playPreview}
-                                            className="flex-1 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 font-bold text-xs flex items-center justify-center gap-1.5"
+                                            className="flex-1 py-2.5 bg-[var(--color-bg-accent)] hover:bg-[var(--color-bg-hover)] rounded-xl text-[var(--color-text-primary)] font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors"
                                         >
                                             {isPlaying ? <Square size={12} fill="currentColor"/> : <Play size={12} fill="currentColor"/>}
                                             {isPlaying ? '停止' : '播放'}
                                         </button>
                                         <button 
                                             onClick={handleConfirmGeneration}
-                                            className="flex-1 py-2 bg-pink-500 hover:bg-pink-600 rounded-lg text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-pink-200"
+                                            className="flex-1 py-2.5 bg-pink-500 hover:bg-pink-600 rounded-xl text-white font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors"
                                         >
                                             <Plus size={14} /> 保存并使用
                                         </button>

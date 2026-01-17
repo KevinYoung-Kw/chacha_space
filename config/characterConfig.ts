@@ -27,6 +27,7 @@ const VIDEO_PATHS = {
   IDLE_LEFT: '/character/3.mp4',
   TRANS_L2C: '/character/4.mp4',
   ACTION_SPEAKING: '/character/5.mp4',
+  ACTION_TODO: '/character/6_transparent_original_color.webm',  // 待办动作（透明背景 - 自然色彩版）
 } as const;
 
 /**
@@ -90,6 +91,15 @@ export function createCustomConfig(): StateMachineConfig {
     videoSource: VIDEO_PATHS.ACTION_SPEAKING,
     isLoop: false,
     nextStateID: VideoStateID.IDLE_CENTER, // 动作结束后返回中间待机
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  // 待办动作（点击待办按钮时触发）
+  states.set(VideoStateID.ACTION_WAVE, {
+    stateID: VideoStateID.ACTION_WAVE,
+    videoSource: VIDEO_PATHS.ACTION_TODO,
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
     preloadStates: [VideoStateID.IDLE_CENTER],
   });
 

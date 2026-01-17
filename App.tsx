@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { AssistantState, Message, TodoItem, WeatherData, UserProfile, TarotResult, WaterRecord, CalorieRecord, SleepRecord, ExerciseRecord } from './types';
 import VideoAvatar, { VideoAvatarRef } from './components/VideoAvatar';
 import ChatInterface from './components/ChatInterface';
@@ -14,6 +14,7 @@ import { generateAssistantResponse } from './services/geminiService';
 import { generateSpeech } from './services/minimaxService';
 import { decodeAudioData, playAudioBuffer } from './services/audioService';
 import { getWeatherByLocation, getWeatherByIP } from './services/weatherService';
+import { createCustomConfig } from './config/characterConfig';
 import { CloudSun, Sparkles, Notebook, Zap, Settings, X, Bell, Clock, Mic2, Activity, CheckSquare, Calendar, Image, Phone } from 'lucide-react';
 
 // Panel Types
@@ -219,6 +220,9 @@ const App: React.FC = () => {
       speak(intro);
   };
 
+  // 缓存视频人物配置（避免每次渲染都重新创建）
+  const characterConfig = useMemo(() => createCustomConfig(), []);
+
   // --- 面板联动逻辑：根据面板状态控制视频人物朝向 ---
   useEffect(() => {
     if (!videoAvatarRef.current) return;
@@ -274,18 +278,19 @@ const App: React.FC = () => {
                 )}
              </div>
 
-             {/* Character - 使用视频状态机驱动的人物 */}
-             <div className="w-full max-w-lg h-[50vh] md:h-[60vh] flex items-center justify-center relative pointer-events-auto">
-                 <VideoAvatar 
-                   ref={videoAvatarRef}
-                   className="h-full w-full"
-                   autoPlay={true}
-                   debug={false}
-                   onStateChange={(event) => {
-                     console.log('[App] Character state:', event.currentState);
-                   }}
-                 />
-             </div>
+              {/* Character - 使用视频状态机驱动的人物 */}
+              <div className="w-full max-w-lg h-[50vh] md:h-[60vh] flex items-center justify-center relative pointer-events-auto">
+                  <VideoAvatar 
+                    ref={videoAvatarRef}
+                    config={characterConfig}
+                    className="h-full w-full"
+                    autoPlay={true}
+                    debug={true}
+                    onStateChange={(event) => {
+                      console.log('[App] Character state:', event.currentState, 'previous:', event.previousState);
+                    }}
+                  />
+              </div>
         </div>
 
         {/* --- Left Panel (Information Board) --- */}
@@ -342,7 +347,21 @@ const App: React.FC = () => {
                 <ToolbarIcon 
                     icon={<CheckSquare size={22} />} 
                     active={rightPanel === 'prod_todo'} 
-                    onClick={() => setRightPanel(rightPanel === 'prod_todo' ? 'none' : 'prod_todo')}
+                    onClick={() => {
+                        const newState = rightPanel === 'prod_todo' ? 'none' : 'prod_todo';
+                        console.log('[App] 待办按钮点击 - 新状态:', newState);
+                        setRightPanel(newState);
+                        // 打开待办面板时播放动作
+                        if (newState === 'prod_todo') {
+                            console.log('[App] 尝试播放 wave 动作, videoAvatarRef:', videoAvatarRef.current);
+                            if (videoAvatarRef.current) {
+                                videoAvatarRef.current.playAction('wave');
+                                console.log('[App] playAction("wave") 已调用');
+                            } else {
+                                console.error('[App] videoAvatarRef.current 为 null!');
+                            }
+                        }
+                    }}
                     label="待办"
                     notification={hasNewTodo}
                     position="right"
