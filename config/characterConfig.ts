@@ -3,6 +3,10 @@
  * 
  * 这个文件定义了视频文件与状态的映射关系
  * 根据实际的视频内容修改此配置
+ * 
+ * 新增功能：
+ * - 空闲检测：30秒无操作播放随机待机，2分钟无操作播放睡觉
+ * - 情绪选择：根据用户输入智能选择动画
  */
 
 import { VideoStateID, VideoState, StateMachineConfig } from '../services/characterStateMachine';
@@ -19,40 +23,56 @@ import { VideoStateID, VideoState, StateMachineConfig } from '../services/charac
  * - action_3.webm: 待机左边（循环）
  * - action_4.webm: 过渡动画（左边 → 中间）
  * - action_5.webm: 说话/动作（单次）
- * - idle.webm: 默认待机动画（循环）
+ * - idle_action_1.webm: 默认待机动画（循环）
  * 
  * 情绪与动作：
  * - happy.webm, excited.webm, rage.webm, scared.webm, disapprove.webm
  * - singing.webm, listening_music.webm, jump.webm
  * - using_phone.webm, checking_phone.webm, taking_notes.webm
+ * - crying.webm, shy.webm, angry_arms_crossed.webm, shouting.webm
+ * - sleeping.webm, listening_v2.webm
+ * - idle_alt.webm, idle_action_1.webm, idle_action_3.webm
  */
 
 // 视频路径常量
 const VIDEO_PATHS = {
   // 基础状态
-  IDLE_CENTER: '/character/action_1.webm',
+  IDLE_CENTER: '/character/idle_action_1.webm',  // 使用 idle_action_1.webm 作为主待机
   TRANS_C2L: '/character/action_2.webm',
   IDLE_LEFT: '/character/action_3.webm',
   TRANS_L2C: '/character/action_4.webm',
   ACTION_SPEAKING: '/character/action_5.webm',
   
   // 默认待机
-  IDLE_DEFAULT: '/character/idle.webm',
+  IDLE_DEFAULT: '/character/idle_action_1.webm',
   
-  // 情绪表达
+  // 情绪表达 - 正面
   EMOTION_HAPPY: '/character/happy.webm',
   EMOTION_EXCITED: '/character/excited.webm',
+  ACTION_JUMP: '/character/jump.webm',
+  
+  // 情绪表达 - 负面
   EMOTION_RAGE: '/character/rage.webm',
   EMOTION_SCARED: '/character/scared.webm',
   EMOTION_DISAPPROVE: '/character/disapprove.webm',
+  EMOTION_CRYING: '/character/crying.webm',
+  EMOTION_SHY: '/character/shy.webm',
+  ACTION_ANGRY_CROSS: '/character/angry_arms_crossed.webm',
+  ACTION_SHOUTING: '/character/shouting.webm',
   
-  // 活动动作
+  // 活动状态
+  ACTION_SLEEPING: '/character/sleeping.webm',
+  ACTION_LISTENING_V2: '/character/listening_v2.webm',
   ACTION_SINGING: '/character/singing.webm',
   ACTION_LISTENING: '/character/listening_music.webm',
-  ACTION_JUMP: '/character/jump.webm',
   ACTION_PHONE: '/character/using_phone.webm',
   ACTION_CHECK_PHONE: '/character/checking_phone.webm',
   ACTION_NOTES: '/character/taking_notes.webm',
+  
+  // 待机变体（用于随机待机）
+  IDLE_ALT: '/character/idle_alt.webm',
+  IDLE_ACTION_1: '/character/idle_action_1.webm',
+  IDLE_ACTION_3: '/character/idle_action_3.webm',
 } as const;
 
 /**
@@ -168,27 +188,43 @@ export function createFullConfig(): StateMachineConfig {
 
 /**
  * 创建带有丰富情绪表达的配置
- * 包含所有情绪和活动动作
+ * 包含所有情绪和活动动作，以及空闲检测配置
  */
 export function createEmotionalConfig(): StateMachineConfig {
   const config = createCustomConfig();
   const { states } = config;
   
-  // 情绪动作映射
+  // 情绪动作映射 - 所有可用的动画
   const emotionActions = [
+    // 情绪 - 正面
     { id: 'ACTION_HAPPY', video: VIDEO_PATHS.EMOTION_HAPPY },
     { id: 'ACTION_EXCITED', video: VIDEO_PATHS.EMOTION_EXCITED },
+    { id: 'ACTION_JUMP', video: VIDEO_PATHS.ACTION_JUMP },
+    
+    // 情绪 - 负面
     { id: 'ACTION_RAGE', video: VIDEO_PATHS.EMOTION_RAGE },
     { id: 'ACTION_SCARED', video: VIDEO_PATHS.EMOTION_SCARED },
     { id: 'ACTION_DISAPPROVE', video: VIDEO_PATHS.EMOTION_DISAPPROVE },
+    { id: 'ACTION_CRYING', video: VIDEO_PATHS.EMOTION_CRYING },
+    { id: 'ACTION_SHY', video: VIDEO_PATHS.EMOTION_SHY },
+    { id: 'ACTION_ANGRY_CROSS', video: VIDEO_PATHS.ACTION_ANGRY_CROSS },
+    { id: 'ACTION_SHOUTING', video: VIDEO_PATHS.ACTION_SHOUTING },
+    
+    // 活动状态
     { id: 'ACTION_SINGING', video: VIDEO_PATHS.ACTION_SINGING },
-    { id: 'ACTION_LISTENING', video: VIDEO_PATHS.ACTION_LISTENING },
-    { id: 'ACTION_JUMP', video: VIDEO_PATHS.ACTION_JUMP },
+    { id: 'ACTION_LISTENING_MUSIC', video: VIDEO_PATHS.ACTION_LISTENING },
     { id: 'ACTION_PHONE', video: VIDEO_PATHS.ACTION_PHONE },
     { id: 'ACTION_CHECK_PHONE', video: VIDEO_PATHS.ACTION_CHECK_PHONE },
     { id: 'ACTION_NOTES', video: VIDEO_PATHS.ACTION_NOTES },
+    { id: 'ACTION_SLEEPING', video: VIDEO_PATHS.ACTION_SLEEPING },
+    { id: 'ACTION_LISTENING_V2', video: VIDEO_PATHS.ACTION_LISTENING_V2 },
+    
+    // 待机变体（用于随机待机动画）
+    { id: 'ACTION_IDLE_ALT', video: VIDEO_PATHS.IDLE_ALT },
+    { id: 'ACTION_IDLE_1', video: VIDEO_PATHS.IDLE_ACTION_1 },
+    { id: 'ACTION_IDLE_3', video: VIDEO_PATHS.IDLE_ACTION_3 },
   ];
-  
+   
   // 添加所有情绪动作到状态机
   emotionActions.forEach(({ id, video }) => {
     states.set(id as VideoStateID, {
@@ -200,7 +236,21 @@ export function createEmotionalConfig(): StateMachineConfig {
     });
   });
   
-  return config;
+  // 添加空闲超时配置
+  return {
+    ...config,
+    idleTimeout: {
+      randomIdleDelay: 30000,   // 30秒无操作 -> 随机待机动画
+      sleepDelay: 120000,       // 2分钟无操作 -> 睡觉动画
+      randomIdleActions: [
+        'idle_alt',      // 备选待机
+        'idle_1',        // 待机动作1
+        'idle_3',        // 待机动作3
+        'listening_v2',  // 倾听
+        'check_phone',   // 查手机
+      ]
+    }
+  };
 }
 
 /**

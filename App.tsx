@@ -9,15 +9,16 @@ import DivinationPanel from './components/tools/DivinationPanel';
 import HealthPanel from './components/tools/HealthPanel';
 import TodoPanel from './components/tools/TodoPanel';
 import SkillsPanel from './components/tools/SkillsPanel';
+import AnimationPanel from './components/tools/AnimationPanel';
 // import VoicePanel from './components/tools/VoicePanel'; // 已移除音色选择功能
 import WatchaPanel from './components/tools/WatchaPanel';
-import { createCustomConfig } from './config/characterConfig';
-import { api, authApi, chatApi, categoryApi, healthApi, todoApi, weatherApi, ttsApi } from './services/api';
+import { createEmotionalConfig } from './config/characterConfig';
+import { api, authApi, chatApi, categoryApi, healthApi, todoApi, weatherApi, ttsApi, emotionApi } from './services/api';
 import { decodeAudioData, playAudioBuffer } from './services/audioService';
-import { CloudSun, Sparkles, Mic2, Activity, CheckSquare, Zap, ChevronUp, ChevronDown, LogOut } from 'lucide-react';
+import { CloudSun, Sparkles, Mic2, Activity, CheckSquare, Zap, ChevronUp, ChevronDown, LogOut, Film } from 'lucide-react';
 
 // Panel Types - 统一管理，所有面板都在右侧显示
-type ActivePanelType = 'none' | 'weather' | 'fortune' | 'health' | 'todo' | 'skills' | 'watcha';
+type ActivePanelType = 'none' | 'weather' | 'fortune' | 'health' | 'todo' | 'skills' | 'watcha' | 'animation';
 
 // 用户信息类型
 interface UserProfile {
@@ -185,12 +186,19 @@ const App: React.FC = () => {
   const processInput = async (text: string) => {
     addMessage('user', text);
     setState(AssistantState.THINKING);
+    
+    // 重置活动计时器（用户有交互）
+    videoAvatarRef.current?.playAction('listening_v2');
 
     try {
-      const result = await chatApi.sendMessage(text);
+      // 并行请求：发送消息 + 检测情绪
+      const [chatResult, emotionResult] = await Promise.all([
+        chatApi.sendMessage(text),
+        emotionApi.detect(text)
+      ]);
       
-      if (result.success && result.data) {
-        const { content, actions } = result.data;
+      if (chatResult.success && chatResult.data) {
+        const { content, actions } = chatResult.data;
         
         // 处理后端返回的动作
         for (const action of actions) {
@@ -208,8 +216,8 @@ const App: React.FC = () => {
               break;
             case 'updateHealth':
               if (action.data.water) {
-        setHealthData(prev => ({
-          ...prev,
+                setHealthData(prev => ({
+                  ...prev,
                   water: { ...prev.water, current: action.data.water.current }
                 }));
               }
@@ -229,15 +237,33 @@ const App: React.FC = () => {
 
         addMessage('assistant', content);
         setState(AssistantState.SPEAKING);
+        
+        // 根据情绪检测结果播放对应动画
+        if (emotionResult.success && emotionResult.data) {
+          const { action: emotionAction } = emotionResult.data;
+          console.log('[Emotion] Detected action:', emotionAction);
+          // 如果是正面或负面情绪，播放对应动画；否则播放说话动画
+          if (emotionAction && emotionAction !== 'listening_v2' && emotionAction !== 'nod') {
+            videoAvatarRef.current?.playAction(emotionAction);
+          } else {
+            videoAvatarRef.current?.playAction('speaking');
+          }
+        } else {
+          // 默认播放说话动画
+          videoAvatarRef.current?.playAction('speaking');
+        }
+        
         await speak(content);
       } else {
-        const errorMsg = result.error || '抱歉，时间线出了点小波动~';
+        const errorMsg = chatResult.error || '抱歉，时间线出了点小波动~';
         addMessage('assistant', errorMsg);
+        videoAvatarRef.current?.playAction('shy'); // 出错时播放害羞动画
         setState(AssistantState.IDLE);
       }
     } catch (error) {
       console.error('[Chat] Error:', error);
       addMessage('assistant', '网络连接不稳定，请稍后再试~');
+      videoAvatarRef.current?.playAction('scared'); // 网络错误时播放害怕动画
       setState(AssistantState.IDLE);
     }
   };
@@ -319,8 +345,8 @@ const App: React.FC = () => {
     else recognitionRef.current?.start();
   }, [isListening]);
 
-  // 缓存视频人物配置
-  const characterConfig = useMemo(() => createCustomConfig(), []);
+   // 缓存视频人物配置
+   const characterConfig = useMemo(() => createEmotionalConfig(), []);
 
   // --- 监听屏幕大小变化 ---
   useEffect(() => {
@@ -346,12 +372,12 @@ const App: React.FC = () => {
   }, [activePanel]);
 
   // --- 语音状态联动 ---
+  // 注意：speaking 动画现在由 processInput 中根据情绪检测结果控制
+  // 这里只处理 thinking 状态
   useEffect(() => {
     if (!videoAvatarRef.current) return;
 
-    if (state === AssistantState.SPEAKING) {
-      videoAvatarRef.current.playAction('speaking');
-    } else if (state === AssistantState.THINKING) {
+    if (state === AssistantState.THINKING) {
       videoAvatarRef.current.playAction('thinking');
     }
   }, [state]);
@@ -428,8 +454,8 @@ const App: React.FC = () => {
           {/* --- 中间区域：叉叉 + 对话框 --- */}
           <div className={`
             flex flex-col items-center justify-center relative z-10
-            transition-all duration-500 ease-out
-            ${hasPanelOpen ? 'flex-[0.55] min-w-0' : 'flex-1'}
+            transition-all duration-500 ease-in-out
+            ${hasPanelOpen ? 'flex-1 min-w-0' : 'flex-1'}
           `}>
             {/* Speech Bubble */}
             <div className="w-full max-w-sm md:max-w-md lg:max-w-lg h-20 md:h-28 flex items-end justify-center mb-2 px-4 pointer-events-none">
@@ -486,28 +512,32 @@ const App: React.FC = () => {
 
           {/* --- 右侧面板区域 --- */}
           <div className={`
-            flex items-center justify-start z-30 pr-3 sm:pr-4 md:pr-6
-            transition-all duration-500 ease-out overflow-hidden
+            flex items-center justify-start z-30 
+            transition-all duration-500 ease-in-out
             ${hasPanelOpen 
-              ? 'flex-[0.45] min-w-0 opacity-100' 
-              : 'w-0 flex-none opacity-0 pointer-events-none'
+              ? 'w-[380px] sm:w-[440px] md:w-[480px] lg:w-[520px] opacity-100 pr-5 sm:pr-6 md:pr-8' 
+              : 'w-0 opacity-0 pointer-events-none pr-0'
             }
-          `}>
+          `} style={{ overflow: 'hidden' }}>
             {hasPanelOpen && (
-              <div className="w-full h-[88vh] max-h-[750px] animate-slide-in-right">
-                <div className="h-full rounded-2xl sm:rounded-3xl lg:rounded-[2rem] overflow-hidden glass-panel-strong border border-white/50">
+              <div className={`
+                w-[360px] sm:w-[420px] md:w-[460px] lg:w-[480px] h-[88vh] max-h-[750px] 
+                flex-shrink-0 transition-all duration-500 ease-out
+                ${hasPanelOpen ? 'translate-x-0 opacity-100' : 'translate-x-12 opacity-0'}
+              `}>
+                <div className="h-full w-full rounded-2xl sm:rounded-3xl lg:rounded-[2rem] overflow-hidden glass-panel-strong border border-white/50 shadow-strong">
                   {activePanel === 'weather' && (
-                             weather ? <WeatherPanel weather={weather} /> 
-                             : <div className="p-8 text-center text-gray-500 flex flex-col items-center justify-center h-full gap-2">
-                                 <span>正在校准时间线...</span>
-                               </div>
-                        )}
+                    weather ? <WeatherPanel weather={weather} /> 
+                    : <div className="p-8 text-center text-gray-500 flex flex-col items-center justify-center h-full gap-2">
+                        <span>正在校准时间线...</span>
+                      </div>
+                  )}
                   {activePanel === 'health' && (
-                            <HealthPanel 
-                                {...healthData}
-                                onAddWater={handleAddWater}
-                            />
-                        )}
+                    <HealthPanel 
+                      {...healthData}
+                      onAddWater={handleAddWater}
+                    />
+                  )}
                   {activePanel === 'fortune' && <DivinationPanel result={tarot} />}
                   {activePanel === 'todo' && (
                     <TodoPanel 
@@ -515,11 +545,11 @@ const App: React.FC = () => {
                       todos={todos} 
                       onToggle={async (id) => {
                         await todoApi.toggle(id);
-                        const result = await todoApi.getList(true); // 获取包括已完成的
+                        const result = await todoApi.getList(true);
                         if (result.success && result.data) {
                           setTodos(result.data);
                         }
-                    }}
+                      }}
                       onAddTodo={async (todo) => {
                         const result = await todoApi.create(todo);
                         if (result.success) {
@@ -536,16 +566,23 @@ const App: React.FC = () => {
                           setTodos(result.data);
                         }
                       }}
-                            />
-                        )}
+                    />
+                  )}
                   {activePanel === 'skills' && <SkillsPanel />}
                   {activePanel === 'watcha' && <WatchaPanel />}
-                    </div>
+                  {activePanel === 'animation' && (
+                    <AnimationPanel 
+                      onPlayAnimation={(actionName) => {
+                        videoAvatarRef.current?.playAction(actionName);
+                      }}
+                    />
+                  )}
                 </div>
+              </div>
             )}
           </div>
         </div>
-    </div>
+      </div>
   );
 };
 
@@ -628,6 +665,7 @@ const ScrollableToolbar = ({
     { id: 'todo' as const, icon: <CheckSquare size={22} />, label: '待办', notification: hasNewTodo },
     { id: 'skills' as const, icon: <Zap size={22} />, label: '技能' },
     { id: 'watcha' as const, icon: <img src="/watcha.svg" alt="Watcha" className="w-5 h-5" style={{ filter: activePanel === 'watcha' ? 'none' : 'opacity(0.6)' }} />, label: 'Watcha' },
+    { id: 'animation' as const, icon: <Film size={22} />, label: '点播' },
   ];
 
   return (

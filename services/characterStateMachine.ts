@@ -6,6 +6,8 @@
  * 2. 双缓冲策略实现无缝视频切换
  * 3. 预加载机制确保零延迟过渡
  * 4. 支持强制打断和自动跳转
+ * 5. 空闲检测 - 长时间不操作自动播放睡觉/随机待机动画
+ * 6. 智能情绪选择 - 根据用户输入选择合适的动画
  */
 
 // ==================== 类型定义 ====================
@@ -28,7 +30,40 @@ export enum VideoStateID {
   ACTION_NOD = 'ACTION_NOD',
   ACTION_THINKING = 'ACTION_THINKING',
   ACTION_SPEAKING = 'ACTION_SPEAKING',
+  
+  // 情绪与动作
+  ACTION_CRYING = 'ACTION_CRYING',
+  ACTION_SHY = 'ACTION_SHY',
+  ACTION_SHOUTING = 'ACTION_SHOUTING',
+  ACTION_SLEEPING = 'ACTION_SLEEPING',
+  ACTION_ANGRY_CROSS = 'ACTION_ANGRY_CROSS',
+  ACTION_LISTENING_V2 = 'ACTION_LISTENING_V2',
+  ACTION_IDLE_ALT = 'ACTION_IDLE_ALT',
+  ACTION_IDLE_1 = 'ACTION_IDLE_1',
+  ACTION_IDLE_3 = 'ACTION_IDLE_3',
+  
+  // 新增：完整情绪动作
+  ACTION_HAPPY = 'ACTION_HAPPY',
+  ACTION_EXCITED = 'ACTION_EXCITED',
+  ACTION_RAGE = 'ACTION_RAGE',
+  ACTION_SCARED = 'ACTION_SCARED',
+  ACTION_DISAPPROVE = 'ACTION_DISAPPROVE',
+  ACTION_SINGING = 'ACTION_SINGING',
+  ACTION_LISTENING_MUSIC = 'ACTION_LISTENING_MUSIC',
+  ACTION_JUMP = 'ACTION_JUMP',
+  ACTION_PHONE = 'ACTION_PHONE',
+  ACTION_CHECK_PHONE = 'ACTION_CHECK_PHONE',
+  ACTION_NOTES = 'ACTION_NOTES',
 }
+
+/** 可用的情绪/动作名称（用于 API 返回） */
+export type EmotionActionName = 
+  | 'idle' | 'idle_alt' | 'idle_1' | 'idle_3'
+  | 'happy' | 'excited' | 'crying' | 'shy' | 'scared'
+  | 'angry' | 'angry_cross' | 'rage' | 'disapprove' | 'shouting'
+  | 'sleeping' | 'listening' | 'listening_v2'
+  | 'singing' | 'jump' | 'phone' | 'check_phone' | 'notes'
+  | 'speaking' | 'thinking' | 'wave' | 'nod';
 
 /** 视频状态对象 */
 export interface VideoState {
@@ -52,6 +87,15 @@ export interface StateMachineConfig {
   initialState: VideoStateID;
   /** 默认回归状态（用于 Action 结束后返回） */
   defaultIdleState: VideoStateID;
+  /** 空闲超时配置 */
+  idleTimeout?: {
+    /** 多少毫秒后触发随机待机动画（默认 30 秒） */
+    randomIdleDelay: number;
+    /** 多少毫秒后触发睡觉动画（默认 2 分钟） */
+    sleepDelay: number;
+    /** 随机待机可选动画列表 */
+    randomIdleActions: string[];
+  };
 }
 
 /** 状态变化事件回调 */
@@ -156,11 +200,74 @@ export class VirtualCharacterStateMachine {
   // 打断标记
   private interruptFlag: boolean = false;
   private transitionLock: boolean = false;
+  
+  // 空闲计时器
+  private lastActivityTime: number = Date.now();
+  private idleCheckInterval: ReturnType<typeof setInterval> | null = null;
+  private isInIdleMode: boolean = false; // 是否已进入空闲模式（正在播放随机待机或睡觉）
 
   constructor(config?: StateMachineConfig) {
     this.config = config || createDefaultConfig();
     this.currentStateID = this.config.initialState;
     this.previousIdleState = this.config.defaultIdleState;
+  }
+  
+  // ==================== 空闲检测 ====================
+  
+  /**
+   * 重置活动时间（用户有交互时调用）
+   */
+  public resetActivityTimer(): void {
+    this.lastActivityTime = Date.now();
+    this.isInIdleMode = false;
+  }
+  
+  /**
+   * 启动空闲检测
+   */
+  public startIdleDetection(): void {
+    if (this.idleCheckInterval) return;
+    
+    const timeout = this.config.idleTimeout || {
+      randomIdleDelay: 30000,  // 30秒
+      sleepDelay: 120000,      // 2分钟
+      randomIdleActions: ['idle_alt', 'idle_1', 'idle_3', 'listening_v2']
+    };
+    
+    this.idleCheckInterval = setInterval(() => {
+      // 如果正在执行非循环动作，不检测空闲
+      if (!this.isIdleState(this.currentStateID) && !this.isInIdleMode) {
+        return;
+      }
+      
+      const idleTime = Date.now() - this.lastActivityTime;
+      
+      // 超过睡觉延迟 -> 播放睡觉
+      if (idleTime >= timeout.sleepDelay && !this.isInIdleMode) {
+        console.log('[StateMachine] Idle timeout reached, playing sleeping animation');
+        this.isInIdleMode = true;
+        this.playAction('sleeping');
+      }
+      // 超过随机待机延迟 -> 播放随机待机动画
+      else if (idleTime >= timeout.randomIdleDelay && !this.isInIdleMode) {
+        const randomAction = timeout.randomIdleActions[
+          Math.floor(Math.random() * timeout.randomIdleActions.length)
+        ];
+        console.log('[StateMachine] Playing random idle animation:', randomAction);
+        this.isInIdleMode = true;
+        this.playAction(randomAction);
+      }
+    }, 5000); // 每5秒检查一次
+  }
+  
+  /**
+   * 停止空闲检测
+   */
+  public stopIdleDetection(): void {
+    if (this.idleCheckInterval) {
+      clearInterval(this.idleCheckInterval);
+      this.idleCheckInterval = null;
+    }
   }
 
   // ==================== 初始化 ====================
@@ -193,6 +300,9 @@ export class VirtualCharacterStateMachine {
 
     // 预加载相邻状态
     this.preloadAdjacentStates(this.currentStateID);
+    
+    // 启动空闲检测
+    this.startIdleDetection();
 
     console.log('[StateMachine] Initialized with state:', this.currentStateID);
     console.log('[StateMachine] Video source:', this.config.states.get(this.currentStateID)?.videoSource);
@@ -462,6 +572,7 @@ export class VirtualCharacterStateMachine {
    */
   public focusLeft(): void {
     console.log('[StateMachine] focusLeft() called');
+    this.resetActivityTimer(); // 重置活动计时器
     
     // 如果已经在左边，不做任何事
     if (this.currentStateID === VideoStateID.IDLE_LEFT) return;
@@ -475,6 +586,7 @@ export class VirtualCharacterStateMachine {
    */
   public focusRight(): void {
     console.log('[StateMachine] focusRight() called');
+    this.resetActivityTimer(); // 重置活动计时器
     
     // 如果已经在右边，不做任何事
     if (this.currentStateID === VideoStateID.IDLE_RIGHT) return;
@@ -491,6 +603,7 @@ export class VirtualCharacterStateMachine {
    */
   public focusCenter(): void {
     console.log('[StateMachine] focusCenter() called');
+    this.resetActivityTimer(); // 重置活动计时器
     
     // 如果已经在中间，不做任何事
     if (this.currentStateID === VideoStateID.IDLE_CENTER) return;
@@ -521,12 +634,48 @@ export class VirtualCharacterStateMachine {
   public playAction(actionName: string): void {
     console.log(`[StateMachine] playAction("${actionName}") called`);
     
+    // 重置活动计时器（除了自动播放的随机待机动画）
+    if (!this.isInIdleMode) {
+      this.resetActivityTimer();
+    }
+    
     // 映射动作名称到状态
     const actionMap: Record<string, VideoStateID> = {
+      // 基础动作
       'wave': VideoStateID.ACTION_WAVE,
       'nod': VideoStateID.ACTION_NOD,
       'thinking': VideoStateID.ACTION_THINKING,
       'speaking': VideoStateID.ACTION_SPEAKING,
+      
+      // 待机变体
+      'idle_alt': VideoStateID.ACTION_IDLE_ALT,
+      'idle_1': VideoStateID.ACTION_IDLE_1,
+      'idle_3': VideoStateID.ACTION_IDLE_3,
+      
+      // 情绪 - 正面
+      'happy': VideoStateID.ACTION_HAPPY,
+      'excited': VideoStateID.ACTION_EXCITED,
+      'jump': VideoStateID.ACTION_JUMP,
+      
+      // 情绪 - 负面
+      'crying': VideoStateID.ACTION_CRYING,
+      'shy': VideoStateID.ACTION_SHY,
+      'scared': VideoStateID.ACTION_SCARED,
+      'angry': VideoStateID.ACTION_ANGRY_CROSS,
+      'angry_cross': VideoStateID.ACTION_ANGRY_CROSS,
+      'rage': VideoStateID.ACTION_RAGE,
+      'disapprove': VideoStateID.ACTION_DISAPPROVE,
+      'shouting': VideoStateID.ACTION_SHOUTING,
+      
+      // 活动状态
+      'sleeping': VideoStateID.ACTION_SLEEPING,
+      'listening': VideoStateID.ACTION_LISTENING_MUSIC,
+      'listening_music': VideoStateID.ACTION_LISTENING_MUSIC,
+      'listening_v2': VideoStateID.ACTION_LISTENING_V2,
+      'singing': VideoStateID.ACTION_SINGING,
+      'phone': VideoStateID.ACTION_PHONE,
+      'check_phone': VideoStateID.ACTION_CHECK_PHONE,
+      'notes': VideoStateID.ACTION_NOTES,
     };
 
     const actionStateID = actionMap[actionName];
@@ -581,6 +730,9 @@ export class VirtualCharacterStateMachine {
    * 销毁状态机，清理资源
    */
   public destroy(): void {
+    // 停止空闲检测
+    this.stopIdleDetection();
+    
     // 停止所有视频
     if (this.bufferA) {
       this.bufferA.element.pause();

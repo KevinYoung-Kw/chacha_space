@@ -42,6 +42,8 @@ export interface VideoAvatarRef {
   pause: () => void;
   /** 获取当前状态 */
   getCurrentState: () => VideoStateID;
+  /** 重置活动计时器（用户有交互时调用） */
+  resetActivityTimer: () => void;
 }
 
 // ==================== 组件实现 ====================
@@ -66,6 +68,7 @@ const VideoAvatar = forwardRef<VideoAvatarRef, VideoAvatarProps>((props, ref) =>
     playAction,
     play,
     pause,
+    resetActivityTimer,
   } = useCharacterStateMachine({
     config,
     onStateChange,
@@ -81,7 +84,8 @@ const VideoAvatar = forwardRef<VideoAvatarRef, VideoAvatarProps>((props, ref) =>
     play,
     pause,
     getCurrentState: () => currentState,
-  }), [focusLeft, focusRight, focusCenter, playAction, play, pause, currentState]);
+    resetActivityTimer,
+  }), [focusLeft, focusRight, focusCenter, playAction, play, pause, currentState, resetActivityTimer]);
 
   // 调试日志
   useEffect(() => {

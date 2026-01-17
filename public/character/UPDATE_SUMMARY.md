@@ -40,7 +40,7 @@
 action_1.webm, action_2.webm, action_3.webm, action_4.webm, action_5.webm
 
 ✨ 默认待机:
-idle.webm
+idle_action_1.webm
 
 ✨ 情绪表达:
 happy.webm, excited.webm, rage.webm, scared.webm, disapprove.webm
@@ -81,7 +81,7 @@ const VIDEO_PATHS = {
   ACTION_SPEAKING: '/character/action_5.webm',
   
   // 默认待机
-  IDLE_DEFAULT: '/character/idle.webm',
+  IDLE_DEFAULT: '/character/idle_action_1.webm',
   
   // 情绪表达 (新增)
   EMOTION_HAPPY: '/character/happy.webm',

@@ -146,7 +146,7 @@ const dailyActions = {
 
 ```typescript
 const idle = {
-  DEFAULT: '/character/idle.webm', // 默认待机动画
+  DEFAULT: '/character/idle_action_1.webm', // 默认待机动画
 };
 ```
 
@@ -227,10 +227,10 @@ import { StateMachineConfig, VideoStateID } from './services/characterStateMachi
 export function createMyCustomConfig(): StateMachineConfig {
   const states = new Map();
   
-  // 使用 idle.webm 作为主要待机状态
+  // 使用 idle_action_1.webm 作为主要待机状态
   states.set(VideoStateID.IDLE_CENTER, {
     stateID: VideoStateID.IDLE_CENTER,
-    videoSource: '/character/idle.webm',
+    videoSource: '/character/idle_action_1.webm',
     isLoop: true,
     nextStateID: null,
     preloadStates: ['ACTION_HAPPY', 'ACTION_EXCITED'],
@@ -271,7 +271,7 @@ export function createMyCustomConfig(): StateMachineConfig {
 
 | 动作类型 | 文件名 | 用途场景 |
 |---------|--------|---------|
-| 默认待机 | `idle.webm` | 主要循环待机 |
+| 默认待机 | `idle_action_1.webm` | 主要循环待机 |
 | 开心 | `happy.webm` | 正面反馈、好评 |
 | 激动 | `excited.webm` | 惊喜、兴奋时刻 |
 | 愤怒 | `rage.webm` | 错误、失败提示 |

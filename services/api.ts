@@ -510,6 +510,40 @@ export const ttsApi = {
   },
 };
 
+// ==================== 情绪/动画 API ====================
+
+export interface EmotionDetectResponse {
+  action: string;
+  description: string;
+  emotion: 'positive' | 'negative' | 'neutral';
+  confidence: 'high' | 'low';
+}
+
+export interface ActionInfo {
+  name: string;
+  description: string;
+  emotion: string;
+}
+
+export const emotionApi = {
+  /**
+   * 检测用户输入的情绪并返回推荐的动画
+   */
+  async detect(message: string): Promise<ApiResponse<EmotionDetectResponse>> {
+    return request<EmotionDetectResponse>('/emotion/detect', {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+    });
+  },
+
+  /**
+   * 获取所有可用的动画列表
+   */
+  async getActions(): Promise<ApiResponse<ActionInfo[]>> {
+    return request<ActionInfo[]>('/emotion/actions');
+  },
+};
+
 // ==================== 记忆 API ====================
 
 export const memoryApi = {
@@ -567,6 +601,7 @@ export const api = {
   weather: weatherApi,
   tts: ttsApi,
   memory: memoryApi,
+  emotion: emotionApi,
 };
 
 export default api;

@@ -7,7 +7,7 @@
 ### 🌟 待机动作
 | 文件名 | 中文描述 | 大小 | 用途 |
 |--------|---------|------|------|
-| `idle.webm` | 待机/呼吸 | 4.0MB | 默认待机循环动画 |
+| `idle_action_1.webm` | 待机动作1 | 5.3MB | 默认待机循环动画 |
 
 ### 😊 情绪表达类
 | 文件名 | 中文描述 | 大小 | 用途 |
@@ -17,12 +17,16 @@
 | `rage.webm` | 无能狂怒 | 2.7MB | 愤怒/沮丧表达 |
 | `scared.webm` | 害怕 | 4.0MB | 恐惧/紧张反应 |
 | `disapprove.webm` | 不认可 | 1.9MB | 拒绝/不同意 |
+| `crying.webm` | 哭泣 | - | 悲伤/委屈 |
+| `shy.webm` | 没眼看 | - | 害羞/尴尬 |
+| `angry_arms_crossed.webm` | 插手生气 | - | 愤怒/生气 |
 
 ### 🎵 娱乐活动类
 | 文件名 | 中文描述 | 大小 | 用途 |
 |--------|---------|------|------|
 | `singing.webm` | 唱歌 | 4.9MB | 唱歌/表演动作 |
 | `listening_music.webm` | 听音乐 | 2.7MB | 享受音乐/放松 |
+| `listening_v2.webm` | 倾听 | - | 对话时的倾听状态 |
 | `jump.webm` | 跳跃 | 1.5MB | 跳跃/欢快动作 |
 
 ### 📱 日常活动类
@@ -31,10 +35,15 @@
 | `using_phone.webm` | 玩手机 | 2.0MB | 使用手机/浏览 |
 | `checking_phone.webm` | 查询手机 | 1.9M | 查看信息/搜索 |
 | `taking_notes.webm` | 记笔记 | 3.4MB | 记录/写字动作 |
+| `shouting.webm` | 大声喊话 | - | 强烈提醒/呼喊 |
+| `sleeping.webm` | 睡觉 | - | 深度休息/挂机 |
 
 ### 🎬 扩展动作（待定义）
 | 文件名 | 中文描述 | 大小 | 备注 |
 |--------|---------|------|------|
+| `idle_alt.webm` | 备选待机 | - | 另一种待机姿态 |
+| `idle_action_1.webm` | 待机动作1 | - | 随机触发的小动作 |
+| `idle_action_3.webm` | 待机动作3 | - | 随机触发的小动作 |
 | `action_1.webm` | 动作1 | 3.5MB | 可根据实际内容重命名 |
 | `action_2.webm` | 动作2 | 1.9MB | 可根据实际内容重命名 |
 | `action_3.webm` | 动作3 | 1.8MB | 可根据实际内容重命名 |
@@ -56,10 +65,10 @@
 ```typescript
 const characterActions = {
   // 待机状态
-  IDLE: 'idle.webm',
+  IDLE: 'idle_action_1.webm',
   
   // 对话状态
-  SPEAKING: 'idle.webm', // 或创建专门的说话动作
+  SPEAKING: 'action_5.webm', // 说话动作
   LISTENING: 'listening_music.webm',
   
   // 情绪反应

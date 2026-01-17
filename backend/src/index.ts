@@ -20,6 +20,7 @@ import healthRoutes from './routes/health';
 import weatherRoutes from './routes/weather';
 import ttsRoutes from './routes/tts';
 import memoryRoutes from './routes/memory';
+import emotionRoutes from './routes/emotion';
 
 // 创建 Express 应用
 const app = express();
@@ -55,6 +56,7 @@ app.use('/api/health', healthRoutes);
 app.use('/api/weather', weatherRoutes);
 app.use('/api/tts', ttsRoutes);
 app.use('/api/memories', memoryRoutes);
+app.use('/api/emotion', emotionRoutes);
 
 // ==================== 健康检查 ====================
 
@@ -131,6 +133,8 @@ async function start() {
       console.log('  GET    /api/weather/city/:name - 获取天气');
       console.log('  POST   /api/tts/synthesize  - 语音合成');
       console.log('  GET    /api/memories        - 获取记忆列表');
+      console.log('  POST   /api/emotion/detect  - 情绪检测（动画选择）');
+      console.log('  GET    /api/emotion/actions - 获取可用动画列表');
       console.log('');
     });
   } catch (error) {

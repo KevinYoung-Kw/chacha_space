@@ -4,7 +4,7 @@
  * 提供响应式的状态机管理，自动处理生命周期和清理
  */
 
-import { useRef, useState, useCallback, useEffect } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { 
   VirtualCharacterStateMachine, 
   createCharacterStateMachine, 
@@ -41,6 +41,8 @@ export interface UseCharacterStateMachineReturn {
   play: () => Promise<void>;
   /** 暂停 */
   pause: () => void;
+  /** 重置活动计时器（用户有交互时调用） */
+  resetActivityTimer: () => void;
   /** 状态机实例（高级用法） */
   stateMachine: VirtualCharacterStateMachine | null;
 }
@@ -135,6 +137,10 @@ export function useCharacterStateMachine(
     stateMachineRef.current?.pause();
   }, []);
 
+  const resetActivityTimer = useCallback(() => {
+    stateMachineRef.current?.resetActivityTimer();
+  }, []);
+
   return {
     containerRef,
     currentState,
@@ -145,6 +151,7 @@ export function useCharacterStateMachine(
     playAction,
     play,
     pause,
+    resetActivityTimer,
     stateMachine: stateMachineRef.current,
   };
 }
