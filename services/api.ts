@@ -559,15 +559,20 @@ export const ttsApi = {
    */
   async synthesize(text: string, voiceId?: string): Promise<ArrayBuffer | null> {
     const token = getAuthToken();
-    if (!token) return null;
+    const deviceId = getOrCreateDeviceId();
 
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-Device-Id': deviceId,
+      };
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch(`${API_BASE_URL}/tts/synthesize`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers,
         body: JSON.stringify({ text, voiceId }),
       });
 

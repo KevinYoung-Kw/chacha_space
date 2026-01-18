@@ -134,14 +134,15 @@ const App: React.FC = () => {
   const [affinityToast, setAffinityToast] = useState<AffinityEvent | null>(null); // 好感度变化提示
   const [floatingHints, setFloatingHints] = useState<Array<{ id: string; event: AffinityEvent; side: 'left' | 'right'; offset: number }>>([]); // 浮动提示列表
   
-  // 从后端加载好感度数据
+  // 从后端加载好感度数据（使用设备ID，不依赖用户登录）
   useEffect(() => {
-    if (user) {
-      loadAffinityData().then(data => {
-        setAffinity(data);
-      });
-    }
-  }, [user]);
+    loadAffinityData().then(data => {
+      console.log('[Affinity] Loaded:', data);
+      setAffinity(data);
+    }).catch(err => {
+      console.error('[Affinity] Load failed:', err);
+    });
+  }, []); // 页面加载时立即执行
 
   // 显示好感度变化提示的辅助函数
   const showAffinityChange = (event: AffinityEvent) => {
