@@ -247,9 +247,9 @@ ${memoryContext}
 
 ${stateContext}
 
-// 保证使用北京时间（东八区），而不是服务器本地时间
 当前日期: ${new Date(Date.now() + 8 * 60 * 60 * 1000).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long', timeZone: 'Asia/Shanghai' })}
 `;
+}
 
 // ==================== 对话生成 ====================
 
