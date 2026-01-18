@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../database/db';
-import { generateToken, authMiddleware } from '../middleware/auth';
+import { generateToken, authMiddleware, defaultUserMiddleware } from '../middleware/auth';
 import { ApiResponse, UserProfile } from '../types';
 
 const router = Router();
@@ -190,9 +190,9 @@ router.post('/check-nickname', async (req: Request, res: Response<ApiResponse>) 
 
 /**
  * POST /api/auth/set-nickname
- * 设置昵称（需要登录）
+ * 设置昵称（使用设备ID认证，与其他接口保持一致）
  */
-router.post('/set-nickname', authMiddleware, async (req: Request, res: Response<ApiResponse>) => {
+router.post('/set-nickname', defaultUserMiddleware, async (req: Request, res: Response<ApiResponse>) => {
   try {
     const { nickname } = req.body;
     const userId = req.user!.userId;
