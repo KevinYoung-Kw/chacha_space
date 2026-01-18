@@ -79,22 +79,32 @@ app.get('/api/health-check', (req, res) => {
 
 if (config.nodeEnv === 'production') {
   const path = require('path');
+  const fs = require('fs');
   
-  // Docker 中静态文件路径: /app/backend/frontend/dist
-  // 或通过环境变量指定
-  const staticPath = process.env.STATIC_PATH || path.join(__dirname, '../frontend/dist');
+  // 静态资源路径（支持多种部署目录）
+  const staticCandidates = [
+    process.env.STATIC_PATH,
+    path.join(process.cwd(), 'frontend/dist'),
+    path.join(__dirname, '../frontend/dist'),
+    path.join(__dirname, '../../frontend/dist'),
+  ].filter(Boolean);
   
-  console.log(`[Static] 服务静态文件目录: ${staticPath}`);
+  const staticPath = staticCandidates.find((candidate: string) => fs.existsSync(candidate));
   
-  // 服务前端静态文件
-  app.use(express.static(staticPath));
-  
-  // 所有其他路由返回前端应用
-  app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api')) {
-      res.sendFile(path.join(staticPath, 'index.html'));
-    }
-  });
+  if (staticPath) {
+    console.log(`[Static] 服务静态文件目录: ${staticPath}`);
+    app.use(express.static(staticPath));
+    
+    // 所有其他路由返回前端应用
+    app.get('*', (req, res) => {
+      if (!req.path.startsWith('/api')) {
+        res.sendFile(path.join(staticPath, 'index.html'));
+      }
+    });
+  } else {
+    console.error('[Static] 未找到前端构建产物，请检查 STATIC_PATH 或镜像构建是否包含 frontend/dist');
+    console.error('[Static] 尝试路径:', staticCandidates);
+  }
 }
 
 // ==================== 错误处理 ====================

@@ -88,7 +88,7 @@ RUN mkdir -p /app/data && chmod 755 /app/data
 ENV NODE_ENV=production
 ENV PORT=7860
 ENV DATABASE_PATH=/app/data/chacha.db
-ENV STATIC_PATH=/app/backend/frontend/dist
+ENV STATIC_PATH=/app/frontend/dist
 
 # 暴露端口
 EXPOSE 7860
