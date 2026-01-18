@@ -17,14 +17,14 @@ function buildTools(categories: TodoCategory[]) {
       type: "function",
       function: {
         name: "addTodo",
-        description: `添加一个新的待办事项。当用户有明显的意图时，譬如说'帮我记一下'、'添加待办'、'提醒我'等时使用。可以设置截止时间和分类。当前可用的分类ID：${categoryMap}`,
+        description: `【极其重要】你需要根据用户表达的意图，主动、准确地调用 addTodo 工具来记录和发布“日志”、“日记”、“备忘”、“生活记录”等类型的信息，不仅仅是“待办”、“提醒”或“记一下”。 只要用户提出有记录内容、想法、生活动态、心情、随手记、生活小结、成长感受、学习心得、健康追踪、锻炼报告、重要时刻等类似表达，也请无一遗漏地调用 addTodo 工具！该工具的 item 字段即为用户需要记录或发布的全部内容描述，categoryId 可根据内容选择最合适的分类（日志/日记类通常有专门分类），如无指定可智能分配。deadline、priority 可为可选，deadline 仅当用户有明确表示截止或期望提醒的时间时设置。当前可用的分类ID：${categoryMap}。请务必捕捉到含“日志”、“日记”、“记录”及生活状态、学习和健康感悟相关的各类表达，无论长短、无论是主动倾诉还是请求帮忙记录！`,
         parameters: {
           type: "object",
           properties: {
-            item: { type: "string", description: "待办事项的具体内容" },
+            item: { type: "string", description: "用户要记录、发表或者备注的全部具体内容，包括日志、生活记录、心情、事件描述等" },
             priority: { type: "string", description: "优先级", enum: ["high", "medium", "low"] },
-            categoryId: { type: "string", description: `分类ID，可选值：${categoryMap}。如果用户没有明确指定分类，可以根据待办内容智能选择合适的分类。` },
-            deadline: { type: "string", description: "截止日期和时间，ISO 8601格式，例如：2026-01-20T18:00:00。如果用户提到了截止时间，需要根据当前时间（2026-01-17）计算具体的日期时间。" }
+            categoryId: { type: "string", description: `分类ID，可选值：${categoryMap}。如果用户没有明确指定分类，可以结合内容智能选择最合适的分类。例如“日志”、“生活记录”可放到生活或日志类。` },
+            deadline: { type: "string", description: "截止日期和时间（如果用户提出）。ISO 8601 格式，例如：2026-01-20T18:00:00。如果用户提到了截止、提醒等时间要求，需据当前时间自动换算具体日期时间。" }
           },
           required: ["item"]
         }
@@ -227,7 +227,7 @@ ${memoryContext}
 - **拒绝AI腔**：不要说"我已经为您..."、"根据查询结果..."，而是说"帮你搞定啦"、"我看了一下..."
 
 ## 3. 核心能力
-1. **日程管理**：addTodo、toggleTodo、deleteTodo
+1. **待办事项管理**：addTodo、toggleTodo、deleteTodo
 2. **天气服务**：getWeather
 3. **健康追踪**：addWater、getHealthStatus
 4. **神秘占卜**：drawTarot
@@ -247,9 +247,9 @@ ${memoryContext}
 
 ${stateContext}
 
-当前日期: ${new Date().toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
+// 保证使用北京时间（东八区），而不是服务器本地时间
+当前日期: ${new Date(Date.now() + 8 * 60 * 60 * 1000).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long', timeZone: 'Asia/Shanghai' })}
 `;
-}
 
 // ==================== 对话生成 ====================
 

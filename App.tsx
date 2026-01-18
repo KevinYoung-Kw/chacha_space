@@ -668,10 +668,11 @@ const App: React.FC = () => {
           const formData = new FormData();
           formData.append('audio', audioBlob, 'recording.webm');
           
-          const response = await fetch('http://localhost:3001/api/speech-to-text', {
+          // 使用相对路径，生产环境同源可直接访问，开发环境通过 vite 代理
+          const response = await fetch('/api/speech-to-text', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
+              'Authorization': `Bearer ${localStorage.getItem('chacha_token')}`
             },
             body: formData
           });
