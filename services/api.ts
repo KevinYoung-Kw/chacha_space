@@ -136,6 +136,17 @@ export function clearAuth(): void {
   localStorage.removeItem('chacha_session');
 }
 
+// 设备ID管理（移到这里以便 request 函数使用）
+function getOrCreateDeviceId(): string {
+  let deviceId = localStorage.getItem('chacha_device_id');
+  if (!deviceId) {
+    // 生成唯一设备ID
+    deviceId = `device_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    localStorage.setItem('chacha_device_id', deviceId);
+  }
+  return deviceId;
+}
+
 // ==================== 基础请求方法 ====================
 
 async function request<T>(
@@ -143,9 +154,11 @@ async function request<T>(
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
   const token = getAuthToken();
+  const deviceId = getOrCreateDeviceId();
   
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
+    'X-Device-Id': deviceId, // 始终发送设备ID作为后备身份标识
     ...options.headers,
   };
   
@@ -177,17 +190,6 @@ async function request<T>(
 }
 
 // ==================== 认证 API ====================
-
-// 设备ID管理
-function getOrCreateDeviceId(): string {
-  let deviceId = localStorage.getItem('chacha_device_id');
-  if (!deviceId) {
-    // 生成唯一设备ID
-    deviceId = `device_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-    localStorage.setItem('chacha_device_id', deviceId);
-  }
-  return deviceId;
-}
 
 export const authApi = {
   /**

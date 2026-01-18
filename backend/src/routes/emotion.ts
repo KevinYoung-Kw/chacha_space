@@ -4,14 +4,14 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { authMiddleware } from '../middleware/auth';
+import { defaultUserMiddleware } from '../middleware/auth';
 import { ApiResponse } from '../types';
 import { config } from '../config';
 
 const router = Router();
 
 // 移除认证中间件，允许任何人访问
-// router.use(authMiddleware);
+router.use(defaultUserMiddleware); // 无认证模式，使用默认用户
 
 // ==================== 可用动画列表 ====================
 

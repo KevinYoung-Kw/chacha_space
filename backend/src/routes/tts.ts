@@ -4,13 +4,13 @@
 
 import { Router, Request, Response } from 'express';
 import { generateSpeech } from '../services/minimax';
-import { authMiddleware } from '../middleware/auth';
+import { defaultUserMiddleware } from '../middleware/auth';
 import { ApiResponse } from '../types';
 
 const router = Router();
 
 // 移除认证中间件，允许任何人访问
-// router.use(authMiddleware);
+router.use(defaultUserMiddleware); // 无认证模式，使用默认用户
 
 /**
  * POST /api/tts/synthesize

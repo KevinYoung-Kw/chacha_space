@@ -5,12 +5,12 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../database/db';
-import { authMiddleware } from '../middleware/auth';
+import { defaultUserMiddleware } from '../middleware/auth';
 import { ApiResponse, TodoItem } from '../types';
 
 const router = Router();
 
-// router.use(authMiddleware); // 移除认证
+router.use(defaultUserMiddleware); // 无认证模式，使用默认用户
 
 /**
  * GET /api/todos

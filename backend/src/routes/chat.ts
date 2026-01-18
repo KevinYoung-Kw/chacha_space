@@ -5,7 +5,7 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../database/db';
-import { authMiddleware } from '../middleware/auth';
+import { defaultUserMiddleware } from '../middleware/auth';
 import { generateChatResponse, generateFinalResponse, ToolCall } from '../services/minimax';
 import { getWeatherForCity } from '../services/weather';
 import {
@@ -22,7 +22,7 @@ import { ApiResponse, TodoItem, TodoCategory, HealthSummary, TarotResult, TarotC
 const router = Router();
 
 // 移除认证中间件，允许任何人访问
-// router.use(authMiddleware);
+router.use(defaultUserMiddleware); // 无认证模式，使用默认用户
 
 // ==================== 塔罗牌数据 ====================
 

@@ -92,6 +92,45 @@ export const optionalAuthMiddleware = (
 };
 
 /**
+ * 设备ID认证中间件
+ * 统一使用设备ID作为用户标识，简单可靠
+ */
+export const defaultUserMiddleware = (
+  req: AuthRequest,
+  res: Response<ApiResponse>,
+  next: NextFunction
+): void => {
+  const deviceId = req.headers['x-device-id'] as string;
+  const path = `${req.method} ${req.path}`;
+  
+  if (!deviceId) {
+    // 详细的错误日志
+    console.error(`[Auth Error] 缺少设备ID - ${path}`);
+    console.error('[Auth Error] 请求头:', JSON.stringify({
+      'x-device-id': req.headers['x-device-id'],
+      'authorization': req.headers.authorization ? '已提供' : '未提供',
+      'content-type': req.headers['content-type'],
+      'origin': req.headers.origin,
+      'user-agent': req.headers['user-agent'],
+    }, null, 2));
+    
+    res.status(401).json({
+      success: false,
+      error: '缺少设备标识，请确保请求头包含 X-Device-Id',
+    });
+    return;
+  }
+
+  // 使用设备ID作为用户标识
+  req.user = {
+    userId: deviceId,
+    email: `${deviceId}@device.local`,
+  };
+  
+  next();
+};
+
+/**
  * 生成 JWT Token
  */
 export const generateToken = (payload: { userId: string; email: string }): string => {

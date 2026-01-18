@@ -4,13 +4,13 @@
 
 import { Router, Response } from 'express';
 import { db } from '../database/db';
-import { authMiddleware, AuthRequest } from '../middleware/auth';
+import { defaultUserMiddleware, AuthRequest } from '../middleware/auth';
 import { ApiResponse, AffinityData, AffinityEvent, AffinityLevel, AffinityActionType } from '../types';
 
 const router = Router();
 
 // 所有路由都需要认证
-// router.use(authMiddleware); // 移除认证
+router.use(defaultUserMiddleware); // 无认证模式，使用默认用户
 
 // 好感度等级阈值（v1-v10，每个等级100分）
 const AFFINITY_LEVELS: Record<AffinityLevel, { min: number; max: number; name: string }> = {
