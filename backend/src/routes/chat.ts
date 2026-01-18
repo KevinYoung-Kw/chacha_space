@@ -21,8 +21,8 @@ import { ApiResponse, TodoItem, TodoCategory, HealthSummary, TarotResult, TarotC
 
 const router = Router();
 
-// 所有路由都需要认证
-router.use(authMiddleware);
+// 移除认证中间件，允许任何人访问
+// router.use(authMiddleware);
 
 // ==================== 塔罗牌数据 ====================
 

@@ -35,6 +35,8 @@ app.use(cors({
   credentials: config.cors.credentials,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Authorization'],
+  maxAge: 86400, // 预检请求缓存24小时
 }));
 
 // JSON 解析

@@ -19,7 +19,19 @@ export const authMiddleware = (
   res: Response<ApiResponse>,
   next: NextFunction
 ): void => {
+  // 跳过 OPTIONS 预检请求
+  if (req.method === 'OPTIONS') {
+    next();
+    return;
+  }
+
   const authHeader = req.headers.authorization;
+
+  // 添加详细日志，帮助调试
+  if (!authHeader) {
+    console.log(`[Auth] 未提供 Authorization 头 - ${req.method} ${req.path}`);
+    console.log('[Auth] Headers:', JSON.stringify(req.headers, null, 2));
+  }
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     res.status(401).json({

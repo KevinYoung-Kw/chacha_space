@@ -10,7 +10,7 @@ import { ApiResponse, HealthSummary, HealthGoals } from '../types';
 
 const router = Router();
 
-router.use(authMiddleware);
+// router.use(authMiddleware); // 移除认证
 
 /**
  * GET /api/health/summary

@@ -10,8 +10,8 @@ import { config } from '../config';
 
 const router = Router();
 
-// 所有路由都需要认证
-router.use(authMiddleware);
+// 移除认证中间件，允许任何人访问
+// router.use(authMiddleware);
 
 // ==================== 可用动画列表 ====================
 

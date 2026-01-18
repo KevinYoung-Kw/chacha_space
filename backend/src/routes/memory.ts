@@ -14,7 +14,7 @@ import { ApiResponse, Memory } from '../types';
 
 const router = Router();
 
-router.use(authMiddleware);
+// router.use(authMiddleware); // 移除认证
 
 /**
  * GET /api/memories

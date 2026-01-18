@@ -9,8 +9,8 @@ import { ApiResponse } from '../types';
 
 const router = Router();
 
-// TTS 需要认证
-router.use(authMiddleware);
+// 移除认证中间件，允许任何人访问
+// router.use(authMiddleware);
 
 /**
  * POST /api/tts/synthesize

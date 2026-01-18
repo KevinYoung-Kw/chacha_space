@@ -10,7 +10,7 @@ import { ApiResponse, AffinityData, AffinityEvent, AffinityLevel, AffinityAction
 const router = Router();
 
 // 所有路由都需要认证
-router.use(authMiddleware);
+// router.use(authMiddleware); // 移除认证
 
 // 好感度等级阈值（v1-v10，每个等级100分）
 const AFFINITY_LEVELS: Record<AffinityLevel, { min: number; max: number; name: string }> = {

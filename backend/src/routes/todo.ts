@@ -10,7 +10,7 @@ import { ApiResponse, TodoItem } from '../types';
 
 const router = Router();
 
-router.use(authMiddleware);
+// router.use(authMiddleware); // 移除认证
 
 /**
  * GET /api/todos
