@@ -61,6 +61,33 @@ function getToken(): string | null {
 }
 
 /**
+ * 获取或创建设备ID
+ */
+function getDeviceId(): string {
+  let deviceId = localStorage.getItem('chacha_device_id');
+  if (!deviceId) {
+    deviceId = `device_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
+    localStorage.setItem('chacha_device_id', deviceId);
+  }
+  return deviceId;
+}
+
+/**
+ * 获取通用请求头
+ */
+function getHeaders(): HeadersInit {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'X-Device-Id': getDeviceId(),
+  };
+  const token = getToken();
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+/**
  * 初始化好感度数据（本地默认值）
  */
 export function initAffinityData(): AffinityData {
@@ -78,20 +105,14 @@ export function initAffinityData(): AffinityData {
  */
 export async function loadAffinityData(): Promise<AffinityData> {
   try {
-    const token = getToken();
-    if (!token) {
-      console.warn('[Affinity] No token, using default data');
-      return initAffinityData();
-    }
-
     const response = await fetch(`${API_BASE_URL}/affinity`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+      headers: getHeaders(),
     });
 
     if (!response.ok) {
-      throw new Error('Failed to load affinity data');
+      const errorText = await response.text();
+      console.error('[Affinity] Load failed:', response.status, errorText);
+      throw new Error(`Failed to load affinity data: ${response.status}`);
     }
 
     const result = await response.json();
@@ -125,18 +146,9 @@ export async function updateAffinity(
   customReason?: string
 ): Promise<{ data: AffinityData; emotion?: string }> {
   try {
-    const token = getToken();
-    if (!token) {
-      console.warn('[Affinity] No token, cannot update');
-      return { data: initAffinityData() };
-    }
-
     const response = await fetch(`${API_BASE_URL}/affinity/update`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
+      headers: getHeaders(),
       body: JSON.stringify({
         action: actionType,
         customReason,
@@ -144,7 +156,9 @@ export async function updateAffinity(
     });
 
     if (!response.ok) {
-      throw new Error('Failed to update affinity');
+      const errorText = await response.text();
+      console.error('[Affinity] Update failed:', response.status, errorText);
+      throw new Error(`Failed to update affinity: ${response.status}`);
     }
 
     const result = await response.json();

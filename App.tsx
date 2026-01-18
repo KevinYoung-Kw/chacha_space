@@ -186,16 +186,38 @@ const App: React.FC = () => {
   const lastClickTimeRef = useRef<number>(0);
   const bgmAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // BGM 播放状态
-  const [isBgmPlaying, setIsBgmPlaying] = useState<boolean>(false);
+  // BGM 播放状态（默认开启）
+  const [isBgmPlaying, setIsBgmPlaying] = useState<boolean>(true);
 
-  // 初始化 BGM
+  // 初始化 BGM 并自动播放
   useEffect(() => {
     if (!bgmAudioRef.current) {
       const audio = new Audio('/bgm/Nintendo Sound Team - Welcome Horizons.mp3');
       audio.loop = true;
       audio.volume = 0.15; // 设置音量为15%
       bgmAudioRef.current = audio;
+      
+      // 自动播放（需要用户交互后才能生效，所以监听点击事件）
+      const tryAutoPlay = () => {
+        audio.play().catch(() => {
+          // 浏览器阻止自动播放，等待用户交互
+          console.log('[BGM] 等待用户交互后播放...');
+        });
+      };
+      
+      // 尝试自动播放
+      tryAutoPlay();
+      
+      // 如果失败，监听用户首次交互
+      const handleFirstInteraction = () => {
+        if (bgmAudioRef.current && bgmAudioRef.current.paused && isBgmPlaying) {
+          bgmAudioRef.current.play().catch(() => {});
+        }
+        document.removeEventListener('click', handleFirstInteraction);
+        document.removeEventListener('keydown', handleFirstInteraction);
+      };
+      document.addEventListener('click', handleFirstInteraction);
+      document.addEventListener('keydown', handleFirstInteraction);
     }
 
     return () => {

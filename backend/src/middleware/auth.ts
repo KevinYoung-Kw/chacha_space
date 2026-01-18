@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { config } from '../config';
 import { JwtPayload, ApiResponse } from '../types';
+import { ensureUserExists } from '../services/user';
 
 /**
  * 扩展 Express Request 以包含 user 属性
@@ -94,39 +95,40 @@ export const optionalAuthMiddleware = (
 /**
  * 设备ID认证中间件
  * 统一使用设备ID作为用户标识，简单可靠
+ * 自动确保用户存在于数据库中
  */
 export const defaultUserMiddleware = (
   req: AuthRequest,
   res: Response<ApiResponse>,
   next: NextFunction
 ): void => {
+  let userId: string;
+  let email: string;
+
+  // 优先从设备ID获取
   const deviceId = req.headers['x-device-id'] as string;
-  const path = `${req.method} ${req.path}`;
   
-  if (!deviceId) {
-    // 详细的错误日志
-    console.error(`[Auth Error] 缺少设备ID - ${path}`);
-    console.error('[Auth Error] 请求头:', JSON.stringify({
-      'x-device-id': req.headers['x-device-id'],
-      'authorization': req.headers.authorization ? '已提供' : '未提供',
-      'content-type': req.headers['content-type'],
-      'origin': req.headers.origin,
-      'user-agent': req.headers['user-agent'],
-    }, null, 2));
-    
-    res.status(401).json({
-      success: false,
-      error: '缺少设备标识，请确保请求头包含 X-Device-Id',
-    });
-    return;
+  if (deviceId) {
+    userId = deviceId;
+    email = `${deviceId}@device.local`;
+  } else {
+    // 后备方案：使用 IP + User-Agent 生成伪设备ID
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const ua = (req.headers['user-agent'] || 'unknown').slice(0, 50);
+    userId = `auto_${Buffer.from(ip + ua).toString('base64').slice(0, 20)}`;
+    email = `${userId}@auto.local`;
+    console.log(`[Auth] 自动生成用户ID: ${userId} (无设备ID)`);
   }
 
-  // 使用设备ID作为用户标识
-  req.user = {
-    userId: deviceId,
-    email: `${deviceId}@device.local`,
-  };
-  
+  // 确保用户存在于数据库
+  try {
+    ensureUserExists(userId, email);
+  } catch (err) {
+    console.error('[Auth] 创建用户失败:', err);
+  }
+
+  // 设置用户信息
+  req.user = { userId, email };
   next();
 };
 

@@ -65,6 +65,7 @@ function getAffinityLevel(value: number): AffinityLevel {
 
 /**
  * 初始化用户好感度数据
+ * 注：用户已在中间件中自动创建
  */
 function initAffinityData(userId: string): void {
   const stmt = db.prepare(`
