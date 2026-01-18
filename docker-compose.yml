@@ -15,7 +15,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=7860
-      - JWT_SECRET=${JWT_SECRET:-chacha-secret-key-please-change-in-production}
+      - JWT_SECRET=${JWT_SECRET:-chacha-secret-key-change-in-production}
       - MINIMAX_API_KEY=${MINIMAX_API_KEY}
       - MINIMAX_GROUP_ID=${MINIMAX_GROUP_ID}
       - AMAP_KEY=${AMAP_KEY}
