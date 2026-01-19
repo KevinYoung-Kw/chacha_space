@@ -397,3 +397,23 @@ body {
     --glass-blur-strong: 28px;
   }
 }
+
+/* ========================================
+   滚动条隐藏工具类
+   ======================================== */
+.scrollbar-hide {
+  /* Firefox */
+  scrollbar-width: none;
+  /* Safari and Chrome */
+  -ms-overflow-style: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* 平滑滚动 */
+.scrollbar-hide {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}

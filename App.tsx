@@ -1222,13 +1222,14 @@ const MobileToolbar: React.FC<ToolbarProps> = ({
 
   return (
     <div className="bg-white/90 backdrop-blur-xl border-t border-gray-200/50 shadow-lg">
-      <div className="flex items-center justify-around px-2 py-2 safe-area-pb">
+      <div className="flex items-center gap-2 px-2 py-2 safe-area-pb overflow-x-auto scrollbar-hide">
         {tools.map((tool) => (
           <button
             key={tool.id}
             onClick={() => togglePanel(tool.id)}
             className={`
               relative flex flex-col items-center justify-center px-3 py-1.5 rounded-xl transition-all duration-200
+              flex-shrink-0 min-w-[60px]
               ${activePanel === tool.id 
                 ? 'bg-[#e6ddd0] text-[#5c4d43]' 
                 : 'text-[#8b7b6d] active:bg-gray-100'}
