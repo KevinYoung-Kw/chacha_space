@@ -1,6 +1,6 @@
 <div align="center">
 
-![叉叉 AI 助手](./public/images/banner.png)
+![叉叉 AI 助手](./public/images/banner.webp)
 
 # 🌟 叉叉 (Cha Cha) - AI 生活助手
 
@@ -30,7 +30,7 @@
 - 🧠 **长期记忆**：AI 记住你的偏好和习惯
 
 <div align="center">
-  <img src="./public/images/poster.png" alt="应用截图" width="800"/>
+  <img src="./public/images/poster.webp" alt="应用截图" width="800"/>
 </div>
 
 ---
