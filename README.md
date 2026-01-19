@@ -1,20 +1,373 @@
 <div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+
+![叉叉 AI 助手](./public/images/banner.png)
+
+# 🌟 叉叉 (Cha Cha) - AI 生活助手
+
+**一个温暖贴心的 AI 虚拟助手，帮你整理生活、提升效率**
+
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)](https://nodejs.org/)
+[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
+
+[在线体验](https://jiangye123-chachaspace.ms.show) · [功能介绍](#-核心功能) · [快速开始](#-快速开始) · [部署指南](#-部署)
+
 </div>
 
-# Run and deploy your AI Studio app
+---
 
-This contains everything you need to run your app locally.
+## 📖 项目简介
 
-View your app in AI Studio: https://ai.studio/apps/drive/13hx3cmM5G0tf1Bpd7gPCYmBUX5DVYbau
+叉叉是一个基于 **React + TypeScript + Node.js** 开发的全栈 AI 助手应用，集成了：
 
-## Run Locally
+- 🤖 **智能对话**：基于 MiniMax AI 的自然语言交互
+- 📝 **待办管理**：智能分类、优先级、截止时间提醒
+- 💪 **健康追踪**：喝水、热量、睡眠、运动记录
+- 🌤️ **天气服务**：实时天气查询与预报
+- 🔮 **神秘占卜**：塔罗牌占卜功能
+- 🎭 **3D 角色动画**：60+ 种情感动作表达
+- 💖 **好感度系统**：10 级好感度成长机制
+- 🧠 **长期记忆**：AI 记住你的偏好和习惯
 
-**Prerequisites:**  Node.js
+<div align="center">
+  <img src="./public/images/poster.png" alt="应用截图" width="800"/>
+</div>
 
+---
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## ✨ 核心功能
+
+### 🎯 智能对话与工具调用
+
+叉叉能理解你的自然语言，并自动调用相应的工具：
+
+```
+你："提醒我明天下午3点开会"
+叉叉：好的！已经帮你添加到待办清单啦～
+     [自动创建待办：开会 | 截止时间：明天 15:00]
+
+你："今天天气怎么样？"
+叉叉：让我看看...今天北京晴天，温度 15°C，很适合出门哦～
+     [自动查询天气并展示]
+```
+
+### 📋 待办事项管理
+
+- ✅ 智能分类（工作、健康、开发、创作等）
+- 🎯 优先级标记（高/中/低）
+- ⏰ 截止时间提醒
+- 📊 完成度统计
+
+### 💪 健康数据追踪
+
+| 功能 | 说明 |
+|------|------|
+| 💧 喝水记录 | 每日饮水量追踪，智能提醒 |
+| 🍎 热量管理 | 饮食热量记录与目标设定 |
+| 😴 睡眠追踪 | 睡眠时长记录 |
+| 🏃 运动记录 | 运动时长与类型记录 |
+
+### 🎭 角色动画系统
+
+叉叉拥有 **60+ 种动作**，包括：
+
+- 😊 情感表达：开心、兴奋、害羞、生气等
+- 👋 互动动作：挥手、跳舞、唱歌等
+- 📱 日常动作：看手机、喝水、做笔记等
+- 🌟 特殊动作：塔罗占卜、天气查询等
+
+### 💖 好感度系统
+
+通过与叉叉的互动提升好感度（v1-v10），解锁更多功能：
+
+```
+v1 初识 → v2 熟悉 → v3 友好 → v4 亲近 → v5 信任
+→ v6 默契 → v7 亲密 → v8 挚友 → v9 知己 → v10 至交
+```
+
+好感度提升方式：
+- ✅ 完成待办事项
+- 💧 保持健康习惯
+- 💬 每日对话互动
+- 🔮 使用各种功能
+
+---
+
+## 🚀 快速开始
+
+### 前置要求
+
+- **Node.js** >= 20.0.0
+- **npm** 或 **pnpm**
+- **Docker** (可选，用于容器化部署)
+
+### 本地开发
+
+#### 1. 克隆项目
+
+```bash
+git clone https://github.com/你的用户名/chacha-assistant.git
+cd chacha-assistant
+```
+
+#### 2. 安装依赖
+
+```bash
+# 安装前端依赖
+npm install
+
+# 安装后端依赖
+cd backend
+npm install
+cd ..
+```
+
+#### 3. 配置环境变量
+
+创建 `.env` 文件（参考 `env.example`）：
+
+```bash
+# MiniMax AI API（必需）
+MINIMAX_API_KEY=your_minimax_api_key
+MINIMAX_GROUP_ID=your_group_id
+
+# 高德地图 API（天气功能）
+AMAP_KEY=your_amap_key
+
+# 阶跃星辰 API（语音识别，可选）
+STEPFUN_API_KEY=your_stepfun_key
+
+# JWT 密钥（可选，有默认值）
+JWT_SECRET=your_random_secret_key
+```
+
+#### 4. 启动开发服务器
+
+```bash
+# 终端 1：启动后端
+cd backend
+npm run dev
+
+# 终端 2：启动前端
+npm run dev
+```
+
+访问 `http://localhost:3000` 即可体验！
+
+---
+
+## 🐳 Docker 部署
+
+### 使用 Docker Compose（推荐）
+
+```bash
+# 1. 配置环境变量（创建 .env 文件）
+cp env.example .env
+# 编辑 .env 填入你的 API Keys
+
+# 2. 构建并启动
+docker-compose up -d
+
+# 3. 查看日志
+docker-compose logs -f
+
+# 4. 停止服务
+docker-compose down
+```
+
+### 手动 Docker 部署
+
+```bash
+# 构建镜像
+docker build -t chacha-assistant .
+
+# 运行容器
+docker run -d \
+  --name chacha \
+  -p 7860:7860 \
+  -v chacha-data:/app/data \
+  -e MINIMAX_API_KEY=your_key \
+  -e MINIMAX_GROUP_ID=your_group_id \
+  -e AMAP_KEY=your_amap_key \
+  chacha-assistant
+```
+
+访问 `http://localhost:7860` 即可！
+
+---
+
+## 🏗️ 技术栈
+
+### 前端
+
+- **框架**: React 18 + TypeScript
+- **构建工具**: Vite
+- **UI**: Tailwind CSS + Lucide Icons
+- **状态管理**: React Hooks
+- **动画**: CSS Animations + Video
+
+### 后端
+
+- **运行时**: Node.js 20
+- **框架**: Express.js + TypeScript
+- **数据库**: SQLite (better-sqlite3)
+- **认证**: JWT + 设备 ID
+- **AI**: MiniMax API
+
+### 第三方服务
+
+- **AI 对话**: [MiniMax](https://www.minimaxi.com/)
+- **语音合成**: MiniMax TTS
+- **天气服务**: [高德地图 API](https://lbs.amap.com/)
+- **语音识别**: 阶跃星辰 API (可选)
+
+---
+
+## 📁 项目结构
+
+```
+hackathon/
+├── backend/                 # 后端服务
+│   ├── src/
+│   │   ├── routes/         # API 路由
+│   │   ├── services/       # 业务逻辑
+│   │   ├── middleware/     # 中间件
+│   │   └── database/       # 数据库
+│   └── package.json
+├── components/             # React 组件
+│   ├── ChatInterface.tsx   # 对话界面
+│   ├── VideoAvatar.tsx     # 3D 角色
+│   ├── tools/              # 工具面板
+│   └── ...
+├── services/               # 前端服务
+│   ├── api.ts              # API 调用
+│   ├── affinityService.ts  # 好感度系统
+│   └── audioService.ts     # 音频服务
+├── public/                 # 静态资源
+│   ├── character/          # 角色动画视频
+│   ├── images/             # 图片资源
+│   └── styles/             # 全局样式
+├── Dockerfile              # Docker 配置
+├── docker-compose.yml      # Docker Compose 配置
+└── README.md               # 项目文档
+```
+
+---
+
+## 🎨 功能截图
+
+### 💬 智能对话
+
+<img src="./public/logo.webp" alt="叉叉 Logo" width="120"/>
+
+叉叉会根据对话内容自动播放相应的动作和表情，让交互更生动自然。
+
+### 📊 数据面板
+
+- **待办清单**：智能分类、优先级管理
+- **健康追踪**：可视化数据展示
+- **天气预报**：3 天天气预报
+- **好感度**：成长进度可视化
+
+### 📱 移动端适配
+
+完美支持手机端，底部工具栏可左右滑动，响应式布局。
+
+---
+
+## 🔧 API 接口
+
+### 认证
+
+```typescript
+POST /api/auth/quick-login      // 快速登录（设备 ID）
+POST /api/auth/set-nickname     // 设置昵称
+GET  /api/auth/profile          // 获取用户信息
+```
+
+### 对话
+
+```typescript
+POST /api/chat/message          // 发送消息
+GET  /api/chat/history          // 获取历史记录
+```
+
+### 待办
+
+```typescript
+GET    /api/todos               // 获取待办列表
+POST   /api/todos               // 创建待办
+PUT    /api/todos/:id           // 更新待办
+DELETE /api/todos/:id           // 删除待办
+PATCH  /api/todos/:id/toggle    // 切换完成状态
+```
+
+### 健康
+
+```typescript
+GET  /api/health/summary        // 获取健康摘要
+POST /api/health/water          // 记录喝水
+POST /api/health/calories       // 记录热量
+POST /api/health/sleep          // 记录睡眠
+POST /api/health/exercise       // 记录运动
+```
+
+### 其他
+
+```typescript
+GET  /api/weather/city/:name    // 获取城市天气
+POST /api/tts/synthesize        // 语音合成
+GET  /api/affinity              // 获取好感度
+POST /api/affinity/update       // 更新好感度
+```
+
+---
+
+## 🤝 贡献指南
+
+欢迎提交 Issue 和 Pull Request！
+
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 提交 Pull Request
+
+---
+
+## 📝 开发日志
+
+### 最近更新
+
+- ✅ 修复跨域问题（生产环境使用相对路径）
+- ✅ 修复认证问题（统一使用设备 ID 认证）
+- ✅ 修复手机端工具栏滚动
+- ✅ 优化好感度系统
+- ✅ 添加 60+ 角色动画
+
+---
+
+## 📄 许可证
+
+本项目采用 [MIT](LICENSE) 许可证。
+
+---
+
+## 🙏 致谢
+
+- [MiniMax](https://www.minimaxi.com/) - AI 对话与语音合成
+- [高德地图](https://lbs.amap.com/) - 天气数据服务
+- [Lucide Icons](https://lucide.dev/) - 精美图标库
+- [Tailwind CSS](https://tailwindcss.com/) - CSS 框架
+
+---
+
+<div align="center">
+
+**用 ❤️ 打造 | Made with Love**
+
+如果觉得这个项目不错，欢迎 ⭐ Star 支持一下！
+
+[报告问题](https://github.com/你的用户名/chacha-assistant/issues) · [功能建议](https://github.com/你的用户名/chacha-assistant/issues)
+
+</div>
