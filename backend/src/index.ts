@@ -129,6 +129,35 @@ app.use((req, res) => {
 
 async function start() {
   try {
+    // 环境变量诊断
+    console.log('');
+    console.log('🔍 环境变量检查...');
+    console.log(`   NODE_ENV: ${config.nodeEnv}`);
+    console.log(`   PORT: ${config.port}`);
+    console.log(`   DATABASE_PATH: ${config.database.path}`);
+    console.log(`   JWT_SECRET: ${config.jwtSecret !== 'chacha-secret-key-change-in-production' ? '✓ 已自定义' : '⚠️ 使用默认值（不安全）'}`);
+    console.log(`   MINIMAX_API_KEY: ${config.minimax.apiKey ? '✓ 已配置' : '✗ 未配置'}`);
+    console.log(`   MINIMAX_GROUP_ID: ${config.minimax.groupId ? '✓ 已配置' : '✗ 未配置'}`);
+    console.log(`   AMAP_KEY: ${config.amap.apiKey ? '✓ 已配置' : '- 未配置（可选）'}`);
+    console.log(`   STEPFUN_API_KEY: ${config.stepfun.apiKey ? '✓ 已配置' : '- 未配置（可选）'}`);
+    console.log(`   CORS_ORIGIN: ${config.cors.origin}`);
+    
+    // 检查必需的环境变量
+    const warnings: string[] = [];
+    if (!config.minimax.apiKey || !config.minimax.groupId) {
+      warnings.push('⚠️  MiniMax API 未配置，AI对话和语音合成功能将不可用');
+    }
+    if (config.jwtSecret === 'chacha-secret-key-change-in-production' && config.nodeEnv === 'production') {
+      warnings.push('⚠️  生产环境使用默认 JWT_SECRET，存在安全风险！');
+    }
+    
+    if (warnings.length > 0) {
+      console.log('');
+      console.log('⚠️  警告:');
+      warnings.forEach(w => console.log(`   ${w}`));
+    }
+    console.log('');
+
     // 初始化数据库
     initDatabase();
     console.log('✅ 数据库初始化完成');
@@ -141,23 +170,32 @@ async function start() {
       console.log('╠═══════════════════════════════════════════════════╣');
       console.log(`║  🚀 服务地址: http://localhost:${config.port}              ║`);
       console.log(`║  📦 环境: ${config.nodeEnv.padEnd(39)}║`);
-      console.log(`║  🔑 JWT: ${config.jwtSecret ? '已配置' : '使用默认值'}                          ║`);
-      console.log(`║  🤖 MiniMax: ${config.minimax.apiKey ? '已配置' : '未配置'}                        ║`);
+      console.log(`║  🗄️  数据库: ${config.database.path.split('/').pop()?.padEnd(33)}║`);
+      console.log(`║  🔑 JWT: ${config.jwtSecret !== 'chacha-secret-key-change-in-production' ? '已配置' : '默认值'}                            ║`);
+      console.log(`║  🤖 MiniMax: ${config.minimax.apiKey ? '✓ 已配置' : '✗ 未配置'}                       ║`);
       console.log('╚═══════════════════════════════════════════════════╝');
       console.log('');
-      console.log('可用的 API 端点:');
-      console.log('  POST   /api/auth/register   - 用户注册');
-      console.log('  POST   /api/auth/login      - 用户登录');
-      console.log('  GET    /api/auth/profile    - 获取用户信息');
-      console.log('  POST   /api/chat/message    - 发送消息');
-      console.log('  GET    /api/todos           - 获取待办列表');
-      console.log('  GET    /api/health/summary  - 获取健康数据');
-      console.log('  GET    /api/weather/city/:name - 获取天气');
-      console.log('  POST   /api/tts/synthesize  - 语音合成');
-      console.log('  GET    /api/memories        - 获取记忆列表');
-      console.log('  POST   /api/emotion/detect  - 情绪检测（动画选择）');
-      console.log('  GET    /api/emotion/actions - 获取可用动画列表');
+      console.log('📋 可用的 API 端点:');
+      console.log('  POST   /api/auth/register          - 用户注册（需邀请码）');
+      console.log('  POST   /api/auth/login             - 用户登录');
+      console.log('  POST   /api/auth/generate-invite   - 生成邀请码（仅本地）');
+      console.log('  GET    /api/auth/profile           - 获取用户信息');
+      console.log('  POST   /api/chat/message           - AI 对话');
+      console.log('  GET    /api/todos                  - 获取待办列表');
+      console.log('  GET    /api/health/summary         - 获取健康数据');
+      console.log('  GET    /api/weather/city/:name     - 获取天气');
+      console.log('  POST   /api/tts/synthesize         - 语音合成');
+      console.log('  GET    /api/memories               - 获取记忆列表');
+      console.log('  POST   /api/emotion/detect         - 情绪检测');
+      console.log('  GET    /api/affinity               - 获取好感度');
+      console.log('  GET    /api/health-check           - 健康检查');
       console.log('');
+      
+      if (config.nodeEnv === 'production') {
+        console.log('💡 提示: 生成邀请码请在服务器本地执行：');
+        console.log('   ./generate-invite-codes.sh -c 10');
+        console.log('');
+      }
     });
   } catch (error) {
     console.error('❌ 服务启动失败:', error);

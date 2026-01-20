@@ -41,6 +41,8 @@ tar -xzf chacha.tar.gz
 
 ### 3. 配置环境变量
 
+**重要：`.env` 文件必须放在项目根目录（与 `docker-compose.yml` 同级）**
+
 在项目根目录创建 `.env` 文件：
 
 ```bash

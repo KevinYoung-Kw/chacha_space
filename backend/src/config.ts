@@ -2,7 +2,12 @@ import dotenv from 'dotenv';
 import path from 'path';
 
 // 加载 .env 文件
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
+// 开发环境：从项目根目录加载 .env
+// Docker 环境：直接使用注入的环境变量，不需要 .env 文件
+if (process.env.NODE_ENV !== 'production') {
+  // 开发环境从项目根目录加载
+  dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+}
 
 export const config = {
   // 服务器配置
