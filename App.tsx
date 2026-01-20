@@ -138,10 +138,8 @@ const App: React.FC = () => {
   useEffect(() => {
     if (user) {
       loadAffinityData().then(data => {
-        console.log('[Affinity] Loaded:', data);
         setAffinity(data);
       }).catch(err => {
-        console.error('[Affinity] Load failed:', err);
       });
     }
   }, [user]); // 用户认证后加载
@@ -204,7 +202,6 @@ const App: React.FC = () => {
       const tryAutoPlay = () => {
         audio.play().catch(() => {
           // 浏览器阻止自动播放，等待用户交互
-          console.log('[BGM] 等待用户交互后播放...');
         });
       };
       
@@ -275,7 +272,6 @@ const App: React.FC = () => {
       setIsBgmPlaying(false);
     } else {
       bgmAudioRef.current.play().catch((err) => {
-        console.error('BGM 播放失败:', err);
       });
       setIsBgmPlaying(true);
     }
@@ -322,7 +318,6 @@ const App: React.FC = () => {
         }
       }
     } catch (err) {
-      console.error('点击互动 TTS 失败:', err);
     }
   }, []);
 
@@ -338,15 +333,20 @@ const App: React.FC = () => {
         return;
       }
 
+      // 初始化 api.ts 中的 token（从 localStorage 读取）
+      console.log('[Auth] 初始化认证状态，token 已存在');
+
       // 验证 token 并获取用户信息
       try {
         const result = await authApi.getProfile();
         if (result.success && result.data) {
           setUser(result.data);
+          console.log('[Auth] ✓ 认证验证成功');
           // 加载用户数据
           loadUserData();
         } else {
           // Token 无效，显示登录界面
+          console.log('[Auth] Token 无效，需要重新登录');
           localStorage.removeItem('chacha_token');
           setShowAuthModal(true);
         }

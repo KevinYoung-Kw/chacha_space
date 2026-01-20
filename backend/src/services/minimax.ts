@@ -406,9 +406,13 @@ const hexToArrayBuffer = (hex: string): ArrayBuffer => {
 
 export async function generateSpeech(text: string, voiceId?: string): Promise<ArrayBuffer | null> {
   const apiKey = config.minimax.apiKey;
-  if (!apiKey) return null;
+  if (!apiKey) {
+    console.error('[MiniMax TTS] API Key 未配置');
+    return null;
+  }
 
   const effectiveVoiceId = voiceId || config.minimax.defaultVoiceId;
+  console.log(`[MiniMax TTS] 请求语音合成 - 文本长度: ${text.length}, 音色: ${effectiveVoiceId}`);
 
   try {
     const response = await fetch(`${config.minimax.baseUrl}/v1/t2a_v2`, {
@@ -437,19 +441,30 @@ export async function generateSpeech(text: string, voiceId?: string): Promise<Ar
       })
     });
 
-    if (!response.ok) return null;
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[MiniMax TTS] API 请求失败: ${response.status} ${response.statusText}`);
+      console.error(`[MiniMax TTS] 错误详情:`, errorText);
+      return null;
+    }
 
     const data = await response.json() as any;
     
-    if (data.base_resp?.status_code !== 0) return null;
-
-    if (data.data?.audio) {
-      return hexToArrayBuffer(data.data.audio);
+    if (data.base_resp?.status_code !== 0) {
+      console.error('[MiniMax TTS] API 返回错误:', data.base_resp?.status_msg || '未知错误');
+      return null;
     }
 
+    if (data.data?.audio) {
+      const audioBuffer = hexToArrayBuffer(data.data.audio);
+      console.log(`[MiniMax TTS] ✓ 合成成功 - 大小: ${(audioBuffer.byteLength / 1024).toFixed(2)} KB`);
+      return audioBuffer;
+    }
+
+    console.error('[MiniMax TTS] API 返回数据中没有音频');
     return null;
-  } catch (e) {
-    console.error("MiniMax TTS Error:", e);
+  } catch (e: any) {
+    console.error("[MiniMax TTS] 异常:", e?.message || e);
     return null;
   }
 }

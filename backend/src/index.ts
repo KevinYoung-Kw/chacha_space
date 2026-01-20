@@ -45,7 +45,6 @@ app.use(express.json({ limit: '10mb' }));
 // 请求日志
 if (config.nodeEnv === 'development') {
   app.use((req, res, next) => {
-    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
     next();
   });
 }
@@ -146,6 +145,7 @@ async function start() {
     const warnings: string[] = [];
     if (!config.minimax.apiKey || !config.minimax.groupId) {
       warnings.push('⚠️  MiniMax API 未配置，AI对话和语音合成功能将不可用');
+      warnings.push('   请在 .env 文件中配置 MINIMAX_API_KEY 和 MINIMAX_GROUP_ID');
     }
     if (config.jwtSecret === 'chacha-secret-key-change-in-production' && config.nodeEnv === 'production') {
       warnings.push('⚠️  生产环境使用默认 JWT_SECRET，存在安全风险！');

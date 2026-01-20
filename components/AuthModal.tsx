@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, Lock, User, Key, Eye, EyeOff } from 'lucide-react';
+import { setAuthToken } from '../services/api';
 
 interface AuthModalProps {
   onSuccess: (token: string, user: any) => void;
@@ -87,8 +88,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
       const result = await response.json();
 
       if (result.success && result.data) {
-        // 保存 token
-        localStorage.setItem('chacha_token', result.data.token);
+        // 保存 token（同时更新内存和 localStorage）
+        setAuthToken(result.data.token);
         onSuccess(result.data.token, result.data.user);
       } else {
         setError(result.error || '注册失败，请重试');
@@ -116,8 +117,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
       const result = await response.json();
 
       if (result.success && result.data) {
-        // 保存 token
-        localStorage.setItem('chacha_token', result.data.token);
+        // 保存 token（同时更新内存和 localStorage）
+        setAuthToken(result.data.token);
         onSuccess(result.data.token, result.data.user);
       } else {
         setError(result.error || '登录失败，请重试');

@@ -35,23 +35,40 @@ router.post('/synthesize', async (req: Request, res: Response) => {
       });
     }
 
+    console.log(`[TTS] 开始合成语音，文本长度: ${text.length}, 音色: ${voiceId || '默认'}`);
+    
     const audioBuffer = await generateSpeech(text, voiceId);
 
     if (!audioBuffer) {
+      console.error('[TTS] 语音合成失败 - MiniMax API 返回空数据');
       return res.status(500).json({
         success: false,
-        error: '语音合成失败'
+        error: '语音合成失败，请检查 API 配置'
       });
     }
 
+    console.log(`[TTS] 语音合成成功，大小: ${(audioBuffer.byteLength / 1024).toFixed(2)} KB`);
+    
     // 返回音频数据
     res.setHeader('Content-Type', 'audio/mpeg');
     res.setHeader('Content-Length', audioBuffer.byteLength.toString());
     res.send(Buffer.from(audioBuffer));
 
-  } catch (error) {
-    console.error('[TTS] Synthesize error:', error);
-    res.status(500).json({ success: false, error: '语音合成失败' });
+  } catch (error: any) {
+    console.error('[TTS] Synthesize error:', error?.message || error);
+    
+    // 根据错误类型返回不同的错误信息
+    let errorMessage = '语音合成失败';
+    if (error?.message?.includes('API')) {
+      errorMessage = 'MiniMax API 调用失败，请检查配置';
+    } else if (error?.message?.includes('network')) {
+      errorMessage = '网络连接失败';
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      error: errorMessage 
+    });
   }
 });
 

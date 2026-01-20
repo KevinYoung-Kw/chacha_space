@@ -164,6 +164,9 @@ async function request<T>(
   
   if (token) {
     (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+    console.log(`[API] 请求 ${endpoint} - 已携带认证 token`);
+  } else {
+    console.log(`[API] 请求 ${endpoint} - 未携带认证 token`);
   }
 
   try {
@@ -174,8 +177,20 @@ async function request<T>(
 
     // 处理未授权
     if (response.status === 401) {
+      // 静默处理认证检查失败（避免控制台警告）
+      if (endpoint === '/auth/profile') {
+        console.log('[API] 认证检查: Token 无效或已过期');
+      } else {
+        console.warn('[API] 未授权访问:', endpoint);
+      }
       clearAuth();
       window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+      
+      // 返回统一的未授权响应
+      return {
+        success: false,
+        error: '请先登录',
+      };
     }
 
     const data = await response.json();
@@ -568,6 +583,9 @@ export const ttsApi = {
       };
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
+        console.log('[TTS] 请求语音合成 - 已携带认证 token');
+      } else {
+        console.warn('[TTS] 请求语音合成 - 未携带认证 token（可能导致 401 错误）');
       }
 
       const response = await fetch(`${API_BASE_URL}/tts/synthesize`, {
@@ -576,7 +594,18 @@ export const ttsApi = {
         body: JSON.stringify({ text, voiceId }),
       });
 
-      if (!response.ok) return null;
+      if (!response.ok) {
+        // 详细的错误日志
+        if (response.status === 401) {
+          console.log('[TTS] 认证失败 - 需要登录');
+        } else if (response.status === 500) {
+          const errorData = await response.json().catch(() => null);
+          console.error('[TTS] 服务器错误:', errorData?.error || '未知错误');
+        } else {
+          console.error('[TTS] 请求失败:', response.status, response.statusText);
+        }
+        return null;
+      }
 
       return await response.arrayBuffer();
     } catch (error) {
