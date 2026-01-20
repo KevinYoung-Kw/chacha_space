@@ -164,6 +164,23 @@ CREATE TABLE IF NOT EXISTS affinity_history (
 CREATE INDEX IF NOT EXISTS idx_affinity_history_user_id ON affinity_history(user_id);
 CREATE INDEX IF NOT EXISTS idx_affinity_history_timestamp ON affinity_history(timestamp);
 
+-- ==================== 邀请码表 ====================
+CREATE TABLE IF NOT EXISTS invite_codes (
+  code TEXT PRIMARY KEY,
+  created_by TEXT,  -- 创建者 user_id（可为 NULL，表示系统创建）
+  used_by TEXT,     -- 使用者 user_id（NULL 表示未使用）
+  created_at TEXT DEFAULT (datetime('now')),
+  used_at TEXT,     -- 使用时间
+  expires_at TEXT,  -- 过期时间（可选）
+  max_uses INTEGER DEFAULT 1,  -- 最大使用次数（当前固定为1）
+  FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL,
+  FOREIGN KEY (used_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- 邀请码索引
+CREATE INDEX IF NOT EXISTS idx_invite_codes_used_by ON invite_codes(used_by);
+CREATE INDEX IF NOT EXISTS idx_invite_codes_created_by ON invite_codes(created_by);
+
 -- ==================== 触发器：自动更新 updated_at ====================
 CREATE TRIGGER IF NOT EXISTS update_users_updated_at 
 AFTER UPDATE ON users

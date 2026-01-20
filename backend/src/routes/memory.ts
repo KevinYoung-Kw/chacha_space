@@ -3,7 +3,7 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { defaultUserMiddleware } from '../middleware/auth';
+import { authMiddleware } from '../middleware/auth';
 import {
   getAllMemories,
   saveMemory,
@@ -14,7 +14,7 @@ import { ApiResponse, Memory } from '../types';
 
 const router = Router();
 
-router.use(defaultUserMiddleware); // 无认证模式，使用默认用户
+router.use(authMiddleware); // JWT 认证
 
 /**
  * GET /api/memories

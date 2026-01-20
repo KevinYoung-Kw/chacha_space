@@ -5,12 +5,12 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../database/db';
-import { defaultUserMiddleware } from '../middleware/auth';
+import { authMiddleware } from '../middleware/auth';
 import { ApiResponse, HealthSummary, HealthGoals } from '../types';
 
 const router = Router();
 
-router.use(defaultUserMiddleware); // 无认证模式，使用默认用户
+router.use(authMiddleware); // JWT 认证
 
 /**
  * GET /api/health/summary

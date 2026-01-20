@@ -169,4 +169,5 @@ export type AffinityActionType =
   | 'daily_chat'         // 每日首次对话
   | 'positive_reply'     // 积极回复
   | 'negative_reply'     // 负面回复
-  | 'no_interaction';    // 长时间不互动
+  | 'no_interaction'     // 长时间不互动
+  | 'test_boost';        // 测试提升（隐藏功能）

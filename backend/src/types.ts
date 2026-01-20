@@ -160,7 +160,8 @@ export type AffinityActionType =
   | 'daily_chat'
   | 'positive_reply'
   | 'negative_reply'
-  | 'no_interaction';
+  | 'no_interaction'
+  | 'test_boost';
 
 export interface AffinityEvent {
   timestamp: number;

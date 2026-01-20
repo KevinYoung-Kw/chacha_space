@@ -406,14 +406,183 @@ body {
   scrollbar-width: none;
   /* Safari and Chrome */
   -ms-overflow-style: none;
+  /* 平滑滚动 */
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
 }
 
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
 
-/* 平滑滚动 */
-.scrollbar-hide {
+/* ========================================
+   移动端键盘处理
+   ======================================== */
+
+/* 防止键盘弹出时整体布局跳动 */
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 使用 dvh 动态视口高度（如果支持） */
+@supports (height: 100dvh) {
+  html, body, #root {
+    height: 100dvh;
+  }
+}
+
+/* 键盘弹出时固定底部元素 */
+.keyboard-avoid {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  transition: transform 0.25s ease-out;
+}
+
+/* 移动端输入框聚焦时的样式 */
+@media (max-width: 640px) {
+  input:focus, textarea:focus {
+    font-size: 16px; /* 防止 iOS 自动缩放 */
+  }
+}
+
+/* ========================================
+   移动端工具栏优化
+   ======================================== */
+.mobile-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.mobile-toolbar::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-toolbar-item {
+  flex: 0 0 auto;
+  scroll-snap-align: center;
+  min-width: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-toolbar-item.active {
+  background: var(--color-bg-accent);
+  color: var(--color-text-primary);
+}
+
+/* ========================================
+   扁平化设计 - 移动端面板
+   ======================================== */
+.mobile-panel {
+  background: var(--color-bg-warm);
+  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+}
+
+.mobile-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.mobile-panel-content {
+  padding: 16px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 扁平化按钮 */
+.flat-btn {
+  background: var(--color-bg-accent);
+  color: var(--color-text-primary);
+  border: none;
+  border-radius: var(--radius-lg);
+  padding: 12px 20px;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+}
+
+.flat-btn:active {
+  background: var(--color-bg-hover);
+  transform: scale(0.98);
+}
+
+.flat-btn-primary {
+  background: var(--color-text-primary);
+  color: white;
+}
+
+.flat-btn-primary:active {
+  background: var(--color-text-secondary);
+}
+
+/* 扁平化输入框 */
+.flat-input {
+  width: 100%;
+  padding: 14px 16px;
+  background: var(--color-bg-base);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  font-size: 16px;
+  color: var(--color-text-primary);
+  transition: all var(--transition-fast);
+}
+
+.flat-input:focus {
+  outline: none;
+  border-color: var(--color-bg-accent);
+  background: white;
+}
+
+.flat-input::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* 扁平化标签按钮 */
+.flat-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--color-bg-base);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.flat-tag.active {
+  background: var(--color-bg-accent);
+  border-color: var(--color-bg-accent);
+  color: var(--color-text-primary);
+}
+
+.flat-tag:active {
+  transform: scale(0.96);
 }

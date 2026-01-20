@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { AssistantState, Message, TodoItem, TodoCategory, WeatherData, TarotResult, WaterRecord, CalorieRecord, SleepRecord, ExerciseRecord, AffinityData, AffinityEvent } from './types';
 import VideoAvatar, { VideoAvatarRef } from './components/VideoAvatar';
 import ChatInterface from './components/ChatInterface';
-import NicknameSetup from './components/NicknameSetup';
+import AuthModal from './components/AuthModal';
 import WeatherPanel from './components/tools/WeatherPanel';
 import DivinationPanel from './components/tools/DivinationPanel';
 import HealthPanel from './components/tools/HealthPanel';
@@ -41,7 +41,7 @@ const App: React.FC = () => {
   // --- 认证状态 ---
   const [user, setUser] = useState<UserProfile | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
-  const [needsNickname, setNeedsNickname] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   
   // Panel States - 统一管理
   const [activePanel, setActivePanel] = useState<ActivePanelType>('none');
@@ -327,34 +327,42 @@ const App: React.FC = () => {
   // --- 检查认证状态 ---
   useEffect(() => {
     const checkAuth = async () => {
-      // 使用快速登录（基于设备ID）
-      const result = await authApi.quickLogin();
+      // 检查 token 是否存在
+      const token = localStorage.getItem('chacha_token');
       
-      if (result.success && result.data) {
-        setUser(result.data.user);
-        
-        // 检查是否需要设置昵称
-        if (result.data.needsNickname) {
-          setNeedsNickname(true);
-        } else {
+      if (!token) {
+        setShowAuthModal(true);
+        setAuthChecked(true);
+        return;
+      }
+
+      // 验证 token 并获取用户信息
+      try {
+        const result = await authApi.getProfile();
+        if (result.success && result.data) {
+          setUser(result.data);
           // 加载用户数据
           loadUserData();
+        } else {
+          // Token 无效，显示登录界面
+          localStorage.removeItem('chacha_token');
+          setShowAuthModal(true);
         }
+      } catch (err) {
+        console.error('[Auth] Token verification failed:', err);
+        localStorage.removeItem('chacha_token');
+        setShowAuthModal(true);
       }
+      
       setAuthChecked(true);
     };
     checkAuth();
 
     // 监听未授权事件
-    const handleUnauthorized = async () => {
-      // 重新尝试快速登录
-      const result = await authApi.quickLogin();
-      if (result.success && result.data) {
-        setUser(result.data.user);
-        if (result.data.needsNickname) {
-          setNeedsNickname(true);
-        }
-      }
+    const handleUnauthorized = () => {
+      localStorage.removeItem('chacha_token');
+      setShowAuthModal(true);
+      setUser(null);
     };
     window.addEventListener('auth:unauthorized', handleUnauthorized);
     return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
@@ -573,10 +581,11 @@ const App: React.FC = () => {
   };
 
   const handleLogout = () => {
-    authApi.logout();
+    localStorage.removeItem('chacha_token');
     setUser(null);
     setMessages([]);
     setTodos([]);
+    setShowAuthModal(true);
   };
 
   // --- 获取天气 ---
@@ -735,6 +744,55 @@ const App: React.FC = () => {
     return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
+  // --- 移动端键盘弹出处理 ---
+  useEffect(() => {
+    // 使用 visualViewport API 处理键盘弹出
+    const handleViewportResize = () => {
+      if (window.visualViewport) {
+        const viewport = window.visualViewport;
+        // 设置 CSS 变量来控制可视区域高度
+        document.documentElement.style.setProperty(
+          '--viewport-height',
+          `${viewport.height}px`
+        );
+        // 滚动到可视区域顶部，防止页面被推上去
+        if (document.activeElement instanceof HTMLInputElement || 
+            document.activeElement instanceof HTMLTextAreaElement) {
+          // 输入框聚焦时，使用更小的偏移
+          window.scrollTo(0, 0);
+        }
+      }
+    };
+
+    // 监听 visualViewport 变化
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportResize);
+      window.visualViewport.addEventListener('scroll', handleViewportResize);
+      handleViewportResize(); // 初始化
+    }
+
+    // 防止 iOS 页面回弹
+    const preventBounce = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      // 只在可滚动区域内允许滚动
+      if (!target.closest('.overflow-y-auto, .overflow-auto, .no-scrollbar')) {
+        if (document.body.scrollTop !== 0) {
+          e.preventDefault();
+        }
+      }
+    };
+
+    document.addEventListener('touchmove', preventBounce, { passive: false });
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleViewportResize);
+        window.visualViewport.removeEventListener('scroll', handleViewportResize);
+      }
+      document.removeEventListener('touchmove', preventBounce);
+    };
+  }, []);
+
   // --- 视频错误恢复机制 ---
   useEffect(() => {
     const errorTimestamps = new Map<HTMLVideoElement, number[]>();
@@ -814,11 +872,10 @@ const App: React.FC = () => {
     }
   }, [state]);
 
-  // --- 昵称设置完成回调 ---
-  const handleNicknameComplete = (nickname: string) => {
-    // 更新用户信息
-    setUser(prev => prev ? { ...prev, name: nickname } : null);
-    setNeedsNickname(false);
+  // --- 登录/注册成功回调 ---
+  const handleAuthSuccess = (token: string, userData: any) => {
+    setUser(userData);
+    setShowAuthModal(false);
     // 加载用户数据
     loadUserData();
     // 欢迎消息
@@ -837,17 +894,17 @@ const App: React.FC = () => {
     );
   }
 
-  // --- 需要设置昵称 ---
-  if (needsNickname) {
-    return <NicknameSetup onComplete={handleNicknameComplete} />;
+  // --- 显示登录/注册界面 ---
+  if (showAuthModal) {
+    return <AuthModal onSuccess={handleAuthSuccess} />;
   }
 
-  // --- 用户未正常加载（极端情况）---
-  if (!user) {
+  // --- 等待认证检查完成 ---
+  if (!authChecked || !user) {
     return (
       <div className="min-h-screen bg-[#fdfcf8] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-pulse text-[#8b7b6d] mb-4">连接中...</div>
+          <div className="animate-pulse text-[#8b7b6d] mb-4">加载中...</div>
           <button
             onClick={() => window.location.reload()}
             className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
@@ -968,19 +1025,21 @@ const App: React.FC = () => {
           </span>
           <button
             onClick={handleLogout}
-            className="p-2 rounded-full bg-white/60 hover:bg-white/80 transition-all"
+            className="flex items-center justify-center p-2 rounded-full bg-white/60 hover:bg-white/80 transition-all"
             title="登出"
           >
             <LogOut size={18} className="text-[#8b7b6d]" />
           </button>
         </div>
 
-        {/* 版本号 - 右下角 */}
-        <div className="absolute bottom-4 right-6 z-50">
-          <div className="text-[10px] sm:text-[11px] text-[#a89b8c] font-mono opacity-60 hover:opacity-100 transition-opacity">
-            v1.0.0
+        {/* 版本号 - 仅桌面端显示 */}
+        {!isMobile && (
+          <div className="absolute bottom-4 right-6 z-50">
+            <div className="text-[10px] sm:text-[11px] text-[#a89b8c] font-mono opacity-60 hover:opacity-100 transition-opacity">
+              v1.0.0
+            </div>
           </div>
-        </div>
+        )}
 
         {/* === 主布局容器 === */}
         <div className="relative h-full w-full flex flex-col sm:flex-row">
@@ -1138,10 +1197,10 @@ const App: React.FC = () => {
 
           {/* --- 手机端全屏面板 --- */}
           {isMobile && hasPanelOpen && (
-            <div className="fixed inset-0 z-50 bg-black/20 backdrop-blur-sm animate-fade-in">
+            <div className="fixed inset-0 z-30 bg-black/20 backdrop-blur-sm animate-fade-in pointer-events-none">
               <div 
-                className="absolute inset-x-0 bottom-0 top-16 bg-white/95 backdrop-blur-xl rounded-t-3xl shadow-2xl animate-slide-up overflow-hidden"
-                style={{ maxHeight: 'calc(100vh - 4rem)' }}
+                className="absolute inset-x-0 top-16 bg-white/95 backdrop-blur-xl rounded-t-3xl shadow-2xl animate-slide-up overflow-hidden pointer-events-auto"
+                style={{ bottom: '72px', maxHeight: 'calc(100vh - 4rem - 72px)' }}
               >
                 {/* 关闭按钮 */}
                 <button 
@@ -1186,24 +1245,53 @@ const MobileToolbar: React.FC<ToolbarProps> = ({
 }) => {
   // 获取当前好感度等级数字（v1 = 1, v2 = 2, ...）
   const affinityLevelNum = parseInt(affinity.level.replace('v', '')) || 1;
+  
+  // 滑动提示状态
+  const [showRightScroll, setShowRightScroll] = React.useState(false);
+  const toolbarRef = React.useRef<HTMLDivElement>(null);
+
+  // 检测是否可以滚动
+  const checkScroll = React.useCallback(() => {
+    const toolbar = toolbarRef.current;
+    if (!toolbar) return;
+
+    const { scrollLeft, scrollWidth, clientWidth } = toolbar;
+    const canScrollRight = scrollLeft + clientWidth < scrollWidth - 5;
+    setShowRightScroll(canScrollRight);
+  }, []);
+
+  // 初始检测和滚动监听
+  React.useEffect(() => {
+    const toolbar = toolbarRef.current;
+    if (!toolbar) return;
+
+    checkScroll();
+    toolbar.addEventListener('scroll', checkScroll);
+    window.addEventListener('resize', checkScroll);
+    
+    return () => {
+      toolbar.removeEventListener('scroll', checkScroll);
+      window.removeEventListener('resize', checkScroll);
+    };
+  }, [checkScroll]);
+
+  const scrollRight = () => {
+    toolbarRef.current?.scrollBy({ left: 200, behavior: 'smooth' });
+  };
 
   const togglePanel = (panel: ActivePanelType) => {
     const newState = activePanel === panel ? 'none' : panel;
     setActivePanel(newState);
     
-    // 隐藏测试功能：打开 Watcha 面板时提升 5 级好感度
+    // 隐藏测试功能：打开 Watcha 面板时提升 5 级好感度（通过 API 同步到数据库）
     if (panel === 'watcha' && newState === 'watcha') {
-      const currentValue = affinity.value;
-      const targetValue = Math.min(1000, currentValue + 500);
-      const newAffinity = {
-        ...affinity,
-        value: targetValue,
-        level: getAffinityLevel(targetValue),
-        lastInteraction: Date.now(),
-      };
-      setAffinity(newAffinity);
-      saveAffinityData(newAffinity);
-      videoAvatarRef.current?.playAction('excited');
+      updateAffinity('test_boost').then(({ data }) => {
+        setAffinity(data);
+        videoAvatarRef.current?.playAction('excited');
+        console.log(`[测试] Watcha 按钮：好感度提升到 ${data.value} (${data.level})`);
+      }).catch(err => {
+        console.error('[测试] 好感度提升失败:', err);
+      });
     }
     
     if (panel === 'todo' && newState === 'todo') {
@@ -1211,37 +1299,66 @@ const MobileToolbar: React.FC<ToolbarProps> = ({
     }
   };
 
-  // 手机端显示的核心工具（精简版）
+  // 手机端显示的核心工具（可左右滑动）
   const tools = [
     { id: 'health' as const, icon: <Activity size={20} />, label: '健康' },
     { id: 'todo' as const, icon: <CheckSquare size={20} />, label: '待办', notification: hasNewTodo },
     { id: 'fortune' as const, icon: <Sparkles size={20} />, label: '占卜' },
     { id: 'weather' as const, icon: <CloudSun size={20} />, label: '天气' },
+    { id: 'memory' as const, icon: <Brain size={20} />, label: '记忆' },
+    { id: 'skills' as const, icon: <Zap size={20} />, label: '技能' },
+    { id: 'animation' as const, icon: <Film size={20} />, label: '动作' },
     { id: 'affinity' as const, icon: <AffinityIndicator variant="toolbar" affinity={affinity} />, label: '好感度' },
   ];
 
   return (
-    <div className="bg-white/90 backdrop-blur-xl border-t border-gray-200/50 shadow-lg">
-      <div className="flex items-center gap-2 px-2 py-2 safe-area-pb overflow-x-auto scrollbar-hide">
+    <div className="glass-panel border-t relative" style={{ borderColor: 'var(--color-border-light)' }}>
+      {/* 右侧滚动按钮（参考电脑端设计） */}
+      <div 
+        className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 transition-all duration-300 ${
+          showRightScroll ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+      >
+        <button
+          onClick={scrollRight}
+          className="flex items-center justify-center p-2 rounded-full bg-white/80 backdrop-blur-sm shadow-md hover:bg-white hover:shadow-lg transition-all duration-200 group"
+          aria-label="查看更多工具"
+        >
+          <svg 
+            className="w-4 h-4 text-[#8b7b6d] group-hover:text-[#5c4d43] transition-colors" 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </button>
+      </div>
+      
+      {/* 右侧渐变遮罩（提示有更多内容） */}
+      <div 
+        className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-[var(--color-bg-base)] via-[var(--color-bg-base)]/60 to-transparent pointer-events-none z-[5]" 
+        style={{ opacity: showRightScroll ? 1 : 0, transition: 'opacity 0.3s' }} 
+      />
+      
+      <div ref={toolbarRef} className="mobile-toolbar safe-area-pb">
         {tools.map((tool) => (
           <button
             key={tool.id}
             onClick={() => togglePanel(tool.id)}
-            className={`
-              relative flex flex-col items-center justify-center px-3 py-1.5 rounded-xl transition-all duration-200
-              flex-shrink-0 min-w-[60px]
-              ${activePanel === tool.id 
-                ? 'bg-[#e6ddd0] text-[#5c4d43]' 
-                : 'text-[#8b7b6d] active:bg-gray-100'}
-            `}
+            className={`mobile-toolbar-item ${activePanel === tool.id ? 'active' : ''}`}
           >
             <span className="relative">
               {tool.icon}
               {tool.notification && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-rose-500 rounded-full border border-white"></span>
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full border border-white" 
+                      style={{ background: 'var(--color-accent-rose)' }} />
               )}
             </span>
-            <span className="text-[10px] mt-0.5 font-medium">{tool.label}</span>
+            <span className="text-[10px] mt-1 font-medium" 
+                  style={{ color: activePanel === tool.id ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+              {tool.label}
+            </span>
           </button>
         ))}
       </div>
@@ -1324,20 +1441,15 @@ const ScrollableToolbar: React.FC<ToolbarProps> = ({
     const newState = activePanel === panel ? 'none' : panel;
     setActivePanel(newState);
     
-    // 隐藏测试功能：打开 Watcha 面板时提升 5 级好感度
+    // 隐藏测试功能：打开 Watcha 面板时提升 5 级好感度（通过 API 同步到数据库）
     if (panel === 'watcha' && newState === 'watcha') {
-      const currentValue = affinity.value;
-      const targetValue = Math.min(1000, currentValue + 500); // 每级100分，5级=500分
-      const newAffinity = {
-        ...affinity,
-        value: targetValue,
-        level: getAffinityLevel(targetValue),
-        lastInteraction: Date.now(),
-      };
-      setAffinity(newAffinity);
-      saveAffinityData(newAffinity);
-      videoAvatarRef.current?.playAction('excited');
-      console.log(`[测试] Watcha 按钮：好感度 ${currentValue} -> ${targetValue} (${affinity.level} -> ${newAffinity.level})`);
+      updateAffinity('test_boost').then(({ data }) => {
+        setAffinity(data);
+        videoAvatarRef.current?.playAction('excited');
+        console.log(`[测试] Watcha 按钮：好感度提升到 ${data.value} (${data.level})`);
+      }).catch(err => {
+        console.error('[测试] 好感度提升失败:', err);
+      });
     }
     
     if (panel === 'todo' && newState === 'todo') {

@@ -4,14 +4,14 @@
 
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { defaultUserMiddleware } from '../middleware/auth';
+import { authMiddleware } from '../middleware/auth';
 import { db } from '../database/db';
 import { ApiResponse, TodoCategory } from '../types';
 
 const router = Router();
 
 // 所有路由都需要认证
-router.use(defaultUserMiddleware); // 无认证模式，使用默认用户
+router.use(authMiddleware); // JWT 认证
 
 // ==================== 获取用户的所有分类 ====================
 router.get('/', (req: Request, res: Response<ApiResponse<TodoCategory[]>>) => {

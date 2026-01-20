@@ -5,7 +5,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { authApi, ttsApi } from '../services/api';
-import { Loader2, AlertCircle, CheckCircle, Sparkles } from 'lucide-react';
+import { Loader2, Sparkles } from 'lucide-react';
 import { decodeAudioData, playAudioBuffer } from '../services/audioService';
 
 interface NicknameSetupProps {
@@ -14,12 +14,9 @@ interface NicknameSetupProps {
 
 const NicknameSetup: React.FC<NicknameSetupProps> = ({ onComplete }) => {
   const [nickname, setNickname] = useState('');
-  const [checking, setChecking] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isAvailable, setIsAvailable] = useState<boolean | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const checkTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
 
   // 初始化音频上下文并朗读欢迎语
@@ -53,51 +50,6 @@ const NicknameSetup: React.FC<NicknameSetupProps> = ({ onComplete }) => {
     return () => clearTimeout(timer);
   }, []);
 
-  // 防抖检查昵称
-  useEffect(() => {
-    if (checkTimeoutRef.current) {
-      clearTimeout(checkTimeoutRef.current);
-    }
-
-    if (!nickname.trim()) {
-      setIsAvailable(null);
-      setError(null);
-      return;
-    }
-
-    if (nickname.trim().length > 20) {
-      setError('昵称最多20个字符哦~');
-      setIsAvailable(false);
-      return;
-    }
-
-    setChecking(true);
-    setError(null);
-    setIsAvailable(null);
-
-    checkTimeoutRef.current = setTimeout(async () => {
-      try {
-        const result = await authApi.checkNickname(nickname.trim());
-        if (result.success && result.data) {
-          setIsAvailable(result.data.available);
-          if (!result.data.available) {
-            setError('这个昵称已经被别人用啦，换一个吧~');
-          }
-        }
-      } catch {
-        // 忽略检查错误
-      } finally {
-        setChecking(false);
-      }
-    }, 500);
-
-    return () => {
-      if (checkTimeoutRef.current) {
-        clearTimeout(checkTimeoutRef.current);
-      }
-    };
-  }, [nickname]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -107,7 +59,8 @@ const NicknameSetup: React.FC<NicknameSetupProps> = ({ onComplete }) => {
       return;
     }
 
-    if (!isAvailable) {
+    if (trimmedNickname.length > 20) {
+      setError('昵称最多20个字符哦~');
       return;
     }
 
@@ -127,6 +80,9 @@ const NicknameSetup: React.FC<NicknameSetupProps> = ({ onComplete }) => {
       setSubmitting(false);
     }
   };
+
+  // 检查昵称长度
+  const isValid = nickname.trim().length > 0 && nickname.trim().length <= 20;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -170,36 +126,25 @@ const NicknameSetup: React.FC<NicknameSetupProps> = ({ onComplete }) => {
               ref={inputRef}
               type="text"
               value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
+              onChange={(e) => {
+                setNickname(e.target.value);
+                setError(null);
+              }}
               placeholder="输入你的昵称..."
               maxLength={20}
               disabled={submitting}
               className={`
                 w-full px-4 py-3 bg-[#f5f0e8] rounded-xl border-2 outline-none transition-all text-[#5c4d43] placeholder:text-[#a89b8c] text-base
-                ${error ? 'border-red-300 focus:border-red-400' : isAvailable ? 'border-green-300 focus:border-green-400' : 'border-transparent focus:border-[#e6ddd0]'}
+                ${error ? 'border-red-300 focus:border-red-400' : 'border-transparent focus:border-[#e6ddd0]'}
                 ${submitting ? 'opacity-50 cursor-not-allowed' : ''}
               `}
             />
-            
-            {/* 状态指示器 */}
-            <div className="absolute right-4 top-1/2 -translate-y-1/2">
-              {checking && (
-                <Loader2 className="w-5 h-5 text-[#a89b8c] animate-spin" />
-              )}
-              {!checking && isAvailable === true && (
-                <CheckCircle className="w-5 h-5 text-green-500" />
-              )}
-              {!checking && isAvailable === false && (
-                <AlertCircle className="w-5 h-5 text-red-400" />
-              )}
-            </div>
           </div>
 
           {/* 错误提示 */}
           {error && (
-            <div className="mt-3 px-2 text-sm text-red-500 flex items-center gap-1.5">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              <span>{error}</span>
+            <div className="mt-3 px-2 text-sm text-red-500">
+              {error}
             </div>
           )}
 
@@ -211,10 +156,10 @@ const NicknameSetup: React.FC<NicknameSetupProps> = ({ onComplete }) => {
           {/* 提交按钮 */}
           <button
             type="submit"
-            disabled={submitting || checking || !nickname.trim() || !isAvailable}
+            disabled={submitting || !isValid}
             className={`
               w-full mt-3 py-3 rounded-xl font-medium text-base shadow-md transition-all flex items-center justify-center gap-2
-              ${submitting || checking || !nickname.trim() || !isAvailable
+              ${submitting || !isValid
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : 'bg-gradient-to-r from-[#8b7b6d] to-[#5c4d43] hover:from-[#7a6b5d] hover:to-[#4d3e35] text-white hover:shadow-lg active:scale-[0.98]'
               }

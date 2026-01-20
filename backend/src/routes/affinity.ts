@@ -4,13 +4,13 @@
 
 import { Router, Response } from 'express';
 import { db } from '../database/db';
-import { defaultUserMiddleware, AuthRequest } from '../middleware/auth';
+import { authMiddleware, AuthRequest } from '../middleware/auth';
 import { ApiResponse, AffinityData, AffinityEvent, AffinityLevel, AffinityActionType } from '../types';
 
 const router = Router();
 
 // 所有路由都需要认证
-router.use(defaultUserMiddleware); // 无认证模式，使用默认用户
+router.use(authMiddleware); // JWT 认证
 
 // 好感度等级阈值（v1-v10，每个等级100分）
 const AFFINITY_LEVELS: Record<AffinityLevel, { min: number; max: number; name: string }> = {
@@ -38,6 +38,7 @@ const AFFINITY_RULES: Record<AffinityActionType, { change: number; reason: strin
   positive_reply: { change: 1, reason: '收到积极的反馈' },
   negative_reply: { change: -3, reason: '收到负面反馈' },
   no_interaction: { change: -1, reason: '好久没来聊天了...' },
+  test_boost: { change: 500, reason: '✨ 测试提升好感度' },
 };
 
 /**
