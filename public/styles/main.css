@@ -3,6 +3,11 @@
  * 定义全局颜色、玻璃态效果、动画等
  */
 
+/* Tailwind CSS */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 /* ========================================
    CSS 变量 - 主题色彩系统
    ======================================== */

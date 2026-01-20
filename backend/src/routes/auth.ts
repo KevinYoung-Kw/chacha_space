@@ -124,12 +124,36 @@ router.post('/generate-invite', async (req: Request, res: Response<ApiResponse>)
   try {
     // 权限检查：只允许来自 localhost 的请求
     const clientIp = req.ip || req.socket.remoteAddress || '';
+    const forwardedFor = req.headers['x-forwarded-for'] as string || '';
+    const realIp = req.headers['x-real-ip'] as string || '';
+    
+    // 记录详细的 IP 信息用于调试
+    console.log('[Auth] 邀请码生成请求 IP 信息:', {
+      clientIp,
+      forwardedFor,
+      realIp,
+      remoteAddress: req.socket.remoteAddress,
+      host: req.headers.host,
+    });
+    
+    // 检查是否为本地请求（支持多种本地 IP 格式）
     const isLocalhost = 
+      // 标准 localhost
       clientIp === '127.0.0.1' || 
       clientIp === '::1' || 
       clientIp === '::ffff:127.0.0.1' ||
       clientIp.startsWith('127.') ||
-      clientIp === 'localhost';
+      clientIp === 'localhost' ||
+      // Docker 内部网络
+      clientIp.startsWith('172.') ||
+      clientIp.startsWith('192.168.') ||
+      clientIp.startsWith('10.') ||
+      // 检查代理头
+      forwardedFor.includes('127.0.0.1') ||
+      realIp === '127.0.0.1' ||
+      // 空 IP（某些 Docker 配置）
+      clientIp === '' ||
+      clientIp === undefined;
 
     if (!isLocalhost) {
       console.warn(`[Auth] 非法访问邀请码生成接口，IP: ${clientIp}`);
@@ -138,6 +162,8 @@ router.post('/generate-invite', async (req: Request, res: Response<ApiResponse>)
         error: '此接口仅限本地服务器访问',
       });
     }
+    
+    console.log('[Auth] ✓ 本地请求验证通过，开始生成邀请码');
 
     const { count = 1, expiresIn } = req.body;
 
