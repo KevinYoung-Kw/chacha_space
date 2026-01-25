@@ -153,46 +153,68 @@ const VideoAvatar = forwardRef<VideoAvatarRef, VideoAvatarProps>((props, ref) =>
         }}
       />
 
-      {/* 加载指示器 - 显示预加载进度 */}
-      {(!isInitialized || !preloadProgress.coreReady) && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-50/80 to-pink-50/80 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-4 px-6 text-center">
-            {/* 加载动画 */}
-            <div className="relative w-20 h-20">
-              <div className="absolute inset-0 border-4 border-purple-200 rounded-full" />
+      {/* 加载指示器 - 温暖扁平化风格 */}
+      {/* 只在初始化前显示，核心视频就绪后立即隐藏 */}
+      {!isInitialized && (
+        <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'var(--color-bg-base)' }}>
+          <div className="flex flex-col items-center gap-5 px-6 text-center animate-fade-in">
+            {/* 简约加载图标 */}
+            <div className="relative animate-breathe">
+              {/* 外圈 - 柔和的背景 */}
               <div 
-                className="absolute inset-0 border-4 border-purple-500 rounded-full border-t-transparent animate-spin"
-                style={{ animationDuration: '1s' }}
-              />
-              {/* 进度数字 */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-purple-600 font-bold text-lg">
-                  {preloadProgress.percent}%
-                </span>
+                className="w-16 h-16 rounded-full flex items-center justify-center"
+                style={{ background: 'var(--color-bg-warm)' }}
+              >
+                {/* 内部旋转点 */}
+                <div className="relative w-10 h-10">
+                  <div 
+                    className="absolute inset-0 rounded-full animate-spin"
+                    style={{ 
+                      border: '2px solid var(--color-border-light)',
+                      borderTopColor: 'var(--color-text-secondary)',
+                      animationDuration: '1.2s'
+                    }}
+                  />
+                </div>
               </div>
             </div>
             
             {/* 加载文案 */}
-            <div className="space-y-1">
-              <span className="text-purple-600 font-medium block">
-                {!preloadProgress.coreReady 
-                  ? '正在唤醒叉叉...' 
-                  : '准备就绪'}
+            <div className="space-y-2">
+              <span 
+                className="font-medium block text-sm tracking-wide"
+                style={{ 
+                  color: 'var(--color-text-primary)',
+                  fontFamily: "'Ma Shan Zheng', 'Zhi Mang Xing', cursive"
+                }}
+              >
+                叉叉正在准备中...
               </span>
-              <span className="text-purple-400 text-xs block">
-                {preloadProgress.currentFile 
-                  ? `加载 ${preloadProgress.currentFile.split('/').pop()}` 
-                  : `已加载 ${preloadProgress.loaded}/${preloadProgress.total} 个资源`}
-              </span>
+              {preloadProgress.loaded > 0 && (
+                <span 
+                  className="text-xs block"
+                  style={{ color: 'var(--color-text-muted)' }}
+                >
+                  已加载 {preloadProgress.loaded} 个资源
+                </span>
+              )}
             </div>
             
-            {/* 进度条 */}
-            <div className="w-48 h-2 bg-purple-100 rounded-full overflow-hidden">
+            {/* 简约进度条 */}
+            {preloadProgress.percent > 0 && (
               <div 
-                className="h-full bg-gradient-to-r from-purple-400 to-pink-400 transition-all duration-300"
-                style={{ width: `${preloadProgress.percent}%` }}
-              />
-            </div>
+                className="w-32 h-1 rounded-full overflow-hidden"
+                style={{ background: 'var(--color-bg-accent)' }}
+              >
+                <div 
+                  className="h-full rounded-full transition-all duration-500 ease-out"
+                  style={{ 
+                    width: `${Math.min(preloadProgress.percent, 100)}%`,
+                    background: 'var(--color-text-secondary)'
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
       )}

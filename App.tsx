@@ -484,14 +484,15 @@ const App: React.FC = () => {
     }
 
     try {
-      // 并行请求：发送消息 + 检测情绪
-      const [chatResult, emotionResult] = await Promise.all([
-        chatApi.sendMessage(text),
-        emotionApi.detect(text)
-      ]);
+      // 先发送聊天请求
+      const chatResult = await chatApi.sendMessage(text);
       
       if (chatResult.success && chatResult.data) {
         const { content, actions } = chatResult.data;
+        
+        // 检测是否有 Function Call（占卜、天气等），用于决定是否需要调用情绪检测
+        let hasFunctionCall = false;
+        let functionCallAnimation: string | null = null;
         
         // 处理后端返回的动作
         for (const action of actions) {
@@ -503,11 +504,17 @@ const App: React.FC = () => {
               setWeather(action.data);
               setActivePanel('weather');
               await applyAffinityChange('weather_check');
+              // Function Call: 天气查询 -> 直接播放 weather 动画
+              hasFunctionCall = true;
+              functionCallAnimation = 'weather';
               break;
             case 'setTarot':
               setTarot(action.data);
               setActivePanel('fortune');
               await applyAffinityChange('fortune_draw');
+              // Function Call: 塔罗占卜 -> 直接播放 tarot_reading 动画
+              hasFunctionCall = true;
+              functionCallAnimation = 'tarot_reading';
               break;
             case 'updateHealth':
               if (action.data.water) {
@@ -516,6 +523,9 @@ const App: React.FC = () => {
                   water: { ...prev.water, current: action.data.water.current }
                 }));
                 await applyAffinityChange('health_water');
+                // Function Call: 喝水记录 -> 播放 drinking_water 动画
+                hasFunctionCall = true;
+                functionCallAnimation = 'drinking_water';
               }
               break;
             default:
@@ -530,26 +540,42 @@ const App: React.FC = () => {
             setTodos(todosResult.data);
             setHasNewTodo(true);
             setTimeout(() => setHasNewTodo(false), 2000);
+            // Function Call: 待办操作 -> 播放 notes 动画
+            if (!hasFunctionCall) {
+              hasFunctionCall = true;
+              functionCallAnimation = 'notes';
+            }
           }
         }
 
         addMessage('assistant', content);
         setState(AssistantState.SPEAKING);
         
-        // 记忆由后端AI自动生成，无需前端处理
-        
-        // 根据情绪检测结果播放对应动画
-        if (emotionResult.success && emotionResult.data) {
-          const { action: emotionAction } = emotionResult.data;
-          // 如果是正面或负面情绪，播放对应动画；否则播放说话动画
-          if (emotionAction && emotionAction !== 'listening_v2' && emotionAction !== 'nod') {
-            videoAvatarRef.current?.playAction(emotionAction);
-          } else {
+        // 根据是否有 Function Call 决定动画
+        if (hasFunctionCall && functionCallAnimation) {
+          // Function Call 场景：直接播放对应动画，不调用情绪检测 API
+          console.log(`[Animation] Function Call 触发，直接播放: ${functionCallAnimation}`);
+          videoAvatarRef.current?.playAction(functionCallAnimation);
+        } else {
+          // 非 Function Call 场景：调用情绪检测 API 选择动画
+          try {
+            const emotionResult = await emotionApi.detect(text);
+            if (emotionResult.success && emotionResult.data) {
+              const { action: emotionAction } = emotionResult.data;
+              // 如果是正面或负面情绪，播放对应动画；否则播放说话动画
+              if (emotionAction && emotionAction !== 'listening_v2' && emotionAction !== 'nod') {
+                videoAvatarRef.current?.playAction(emotionAction);
+              } else {
+                videoAvatarRef.current?.playAction('speaking');
+              }
+            } else {
+              // 默认播放说话动画
+              videoAvatarRef.current?.playAction('speaking');
+            }
+          } catch (emotionError) {
+            console.warn('[Emotion] 情绪检测失败，使用默认动画:', emotionError);
             videoAvatarRef.current?.playAction('speaking');
           }
-        } else {
-          // 默认播放说话动画
-          videoAvatarRef.current?.playAction('speaking');
         }
         
         await speak(content);

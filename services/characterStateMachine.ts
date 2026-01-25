@@ -473,11 +473,15 @@ export class VirtualCharacterStateMachine {
    * 切换到指定状态（核心方法）
    * @param targetStateID 目标状态
    * @param isInterrupt 是否为打断操作
+   * @param retryCount 重试次数（内部使用）
    */
-  private async transitionTo(targetStateID: VideoStateID, isInterrupt: boolean = false): Promise<void> {
+  private async transitionTo(targetStateID: VideoStateID, isInterrupt: boolean = false, retryCount: number = 0): Promise<void> {
+    const MAX_RETRIES = 2;
+    
     // 获取目标状态配置
     const targetState = this.config.states.get(targetStateID);
     if (!targetState) {
+      console.warn(`[StateMachine] 状态 ${targetStateID} 不存在`);
       return;
     }
 
@@ -505,27 +509,37 @@ export class VirtualCharacterStateMachine {
     // 预加载下一个视频到待命缓冲区
     this.loadVideoToBuffer(nextBuffer, targetStateID);
 
-    // 等待下一个视频准备就绪
-    await this.waitForVideoReady(nextBuffer, 5000);
+    // 等待下一个视频准备就绪（使用较短的超时时间）
+    await this.waitForVideoReady(nextBuffer, 3000);
 
     // 检查视频是否真的准备好了
-    if (nextBuffer.element.error) {
-
-      // 如果目标状态是IDLE_CENTER，说明已经在尝试回退了，不要再回退
-      if (targetStateID === VideoStateID.IDLE_CENTER) {
-        return;
-      }
+    if (nextBuffer.element.error || nextBuffer.element.readyState < 2) {
+      console.warn(`[StateMachine] 视频加载失败或未就绪: ${targetState.videoSource.split('/').pop()}`);
       
-      // 如果当前buffer还在正常播放，就保持当前状态
+      // 如果当前 buffer 还在正常播放，就保持当前状态
       if (currentBuffer.element && !currentBuffer.element.error && !currentBuffer.element.paused) {
+        console.log('[StateMachine] 保持当前状态，当前视频仍在播放');
+        this.interruptFlag = false;
         return;
       }
       
-      // 尝试回退到idle状态
-      // 使用 setTimeout 避免递归调用堆栈过深
-      setTimeout(() => {
-        this.transitionTo(VideoStateID.IDLE_CENTER, true);
-      }, 100);
+      // 如果目标状态是 IDLE_CENTER 且已达到最大重试次数，就不再重试
+      if (targetStateID === VideoStateID.IDLE_CENTER && retryCount >= MAX_RETRIES) {
+        console.warn('[StateMachine] IDLE_CENTER 加载失败，尝试使用原始 URL');
+        // 最后的尝试：直接使用原始 URL（不通过缓存）
+        nextBuffer.element.src = targetState.videoSource;
+        nextBuffer.element.load();
+        this.interruptFlag = false;
+        return;
+      }
+      
+      // 尝试回退到 idle 状态
+      if (targetStateID !== VideoStateID.IDLE_CENTER) {
+        console.log('[StateMachine] 尝试回退到 IDLE_CENTER');
+        setTimeout(() => {
+          this.transitionTo(VideoStateID.IDLE_CENTER, true, retryCount + 1);
+        }, 100);
+      }
       return;
     }
 
@@ -548,6 +562,7 @@ export class VirtualCharacterStateMachine {
     try {
       await nextBuffer.element.play();
     } catch (e) {
+      console.warn('[StateMachine] 自动播放被阻止，等待用户交互');
       // 当自动播放被阻止时，添加一次性点击监听器来恢复播放
       const resumePlayback = async () => {
         try {
@@ -786,8 +801,9 @@ export class VirtualCharacterStateMachine {
   /**
    * 场景 D：播放一次性动作
    * @param actionName 动作名称
+   * @param timeout 超时时间（毫秒），超时后自动回退到待机状态
    */
-  public playAction(actionName: string): void {
+  public playAction(actionName: string, timeout: number = 8000): void {
     
     // 重置活动计时器（除了自动播放的随机待机动画）
     if (!this.isInIdleMode) {
@@ -866,11 +882,29 @@ export class VirtualCharacterStateMachine {
     // 检查状态是否存在
     const actionState = this.config.states.get(actionStateID);
     if (!actionState) {
+      console.warn(`[StateMachine] 动作状态 ${actionStateID} 未配置`);
       return;
     }
 
     // 修改动作状态的 nextStateID 为当前待机状态
     actionState.nextStateID = this.previousIdleState;
+
+    // 设置超时保护 - 如果动作播放超时，自动回退到待机状态
+    const actionTimeoutId = setTimeout(() => {
+      // 检查当前是否还在这个动作状态
+      if (this.currentStateID === actionStateID) {
+        console.warn(`[StateMachine] 动作 ${actionName} 超时，回退到待机状态`);
+        this.transitionTo(this.previousIdleState || VideoStateID.IDLE_CENTER, true);
+      }
+    }, timeout);
+    
+    // 添加一次性状态变化监听器，在动作完成后清除超时
+    const cleanup = this.addStateChangeListener((event) => {
+      if (event.previousState === actionStateID) {
+        clearTimeout(actionTimeoutId);
+        cleanup();
+      }
+    });
 
     // 执行动作
     this.transitionTo(actionStateID, true);

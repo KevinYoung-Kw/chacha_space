@@ -19,20 +19,46 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
   const [preloadProgress, setPreloadProgress] = useState<PreloadProgress>({
     total: 0,
     loaded: 0,
+    failed: 0,
     percent: 0,
     coreReady: false,
   });
 
-  // 登录页面显示时，开始预加载核心视频
+  // 登录页面显示时，开始预加载核心视频（非阻塞）
   useEffect(() => {
+    let mounted = true;
+    
     console.log('[AuthModal] 开始预加载核心视频资源...');
+    
     preloadCoreVideos((progress) => {
-      setPreloadProgress(progress);
+      if (mounted) {
+        setPreloadProgress(progress);
+      }
     }).then(() => {
-      console.log('[AuthModal] ✓ 核心视频预加载完成');
+      if (mounted) {
+        console.log('[AuthModal] ✓ 核心视频预加载完成');
+      }
     }).catch((err) => {
-      console.error('[AuthModal] 视频预加载失败:', err);
+      // 预加载失败不影响登录流程
+      console.warn('[AuthModal] 视频预加载出错，但不影响使用:', err);
+      if (mounted) {
+        // 标记为就绪，让用户可以继续
+        setPreloadProgress(prev => ({ ...prev, coreReady: true }));
+      }
     });
+    
+    // 30秒后强制标记为就绪
+    const timeout = setTimeout(() => {
+      if (mounted && !preloadProgress.coreReady) {
+        console.warn('[AuthModal] 预加载超时，强制标记为就绪');
+        setPreloadProgress(prev => ({ ...prev, coreReady: true }));
+      }
+    }, 30000);
+    
+    return () => {
+      mounted = false;
+      clearTimeout(timeout);
+    };
   }, []);
 
   // 注册表单
@@ -307,19 +333,34 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
               {isLoading ? '注册中...' : '开始探索'}
             </button>
             
-            {/* 预加载进度提示 */}
-            {!preloadProgress.coreReady && (
-              <div className="mt-3 flex items-center justify-center gap-2 text-xs text-[#a89b8c]">
-                <div className="w-3 h-3 border-2 border-[#8b7b6d] border-t-transparent rounded-full animate-spin" />
-                <span>正在准备虚拟形象资源... {preloadProgress.percent}%</span>
-              </div>
-            )}
-            {preloadProgress.coreReady && (
-              <div className="mt-3 flex items-center justify-center gap-2 text-xs text-green-600">
-                <span>✓</span>
-                <span>虚拟形象已准备就绪</span>
-              </div>
-            )}
+            {/* 预加载进度提示 - 简约风格 */}
+            <div className="mt-4 flex flex-col items-center gap-2">
+              {!preloadProgress.coreReady ? (
+                <>
+                  <div className="flex items-center gap-2 text-xs text-[#a89b8c]">
+                    <div 
+                      className="w-3 h-3 rounded-full animate-spin"
+                      style={{ 
+                        border: '1.5px solid #e6ddd0',
+                        borderTopColor: '#8b7b6d'
+                      }}
+                    />
+                    <span>正在准备叉叉...</span>
+                  </div>
+                  <div className="w-24 h-0.5 rounded-full overflow-hidden bg-[#e6ddd0]">
+                    <div 
+                      className="h-full rounded-full transition-all duration-300 bg-[#8b7b6d]"
+                      style={{ width: `${preloadProgress.percent}%` }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-1.5 text-xs text-[#8b7b6d]">
+                  <span className="text-[#5c4d43]">✓</span>
+                  <span>叉叉已准备就绪</span>
+                </div>
+              )}
+            </div>
           </form>
         )}
 
@@ -374,19 +415,34 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
               {isLoading ? '登录中...' : '进入空间'}
             </button>
             
-            {/* 预加载进度提示 */}
-            {!preloadProgress.coreReady && (
-              <div className="mt-3 flex items-center justify-center gap-2 text-xs text-[#a89b8c]">
-                <div className="w-3 h-3 border-2 border-[#8b7b6d] border-t-transparent rounded-full animate-spin" />
-                <span>正在准备虚拟形象资源... {preloadProgress.percent}%</span>
-              </div>
-            )}
-            {preloadProgress.coreReady && (
-              <div className="mt-3 flex items-center justify-center gap-2 text-xs text-green-600">
-                <span>✓</span>
-                <span>虚拟形象已准备就绪</span>
-              </div>
-            )}
+            {/* 预加载进度提示 - 简约风格 */}
+            <div className="mt-4 flex flex-col items-center gap-2">
+              {!preloadProgress.coreReady ? (
+                <>
+                  <div className="flex items-center gap-2 text-xs text-[#a89b8c]">
+                    <div 
+                      className="w-3 h-3 rounded-full animate-spin"
+                      style={{ 
+                        border: '1.5px solid #e6ddd0',
+                        borderTopColor: '#8b7b6d'
+                      }}
+                    />
+                    <span>正在准备叉叉...</span>
+                  </div>
+                  <div className="w-24 h-0.5 rounded-full overflow-hidden bg-[#e6ddd0]">
+                    <div 
+                      className="h-full rounded-full transition-all duration-300 bg-[#8b7b6d]"
+                      style={{ width: `${preloadProgress.percent}%` }}
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center gap-1.5 text-xs text-[#8b7b6d]">
+                  <span className="text-[#5c4d43]">✓</span>
+                  <span>叉叉已准备就绪</span>
+                </div>
+              )}
+            </div>
           </form>
         )}
 

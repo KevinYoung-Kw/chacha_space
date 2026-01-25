@@ -7,13 +7,14 @@
  * 3. 使用 Cache API 持久化缓存
  * 4. 提供加载进度和状态
  * 5. 支持在登录/注册阶段预加载
+ * 6. 容错机制 - 部分资源失败不影响整体使用
  */
 
 // ==================== 类型定义 ====================
 
 export interface VideoLoadState {
   url: string;
-  status: 'pending' | 'loading' | 'loaded' | 'error';
+  status: 'pending' | 'loading' | 'loaded' | 'error' | 'skipped';
   progress: number; // 0-100
   blob?: Blob;
   objectUrl?: string;
@@ -23,6 +24,7 @@ export interface VideoLoadState {
 export interface PreloadProgress {
   total: number;
   loaded: number;
+  failed: number;
   percent: number;
   coreReady: boolean; // 核心视频是否已全部加载
   currentFile?: string;
@@ -30,21 +32,31 @@ export interface PreloadProgress {
 
 export type PreloadProgressCallback = (progress: PreloadProgress) => void;
 
+// ==================== 配置常量 ====================
+
+// 单个视频加载超时时间（毫秒）
+const LOAD_TIMEOUT = 15000; // 15秒
+
+// 核心视频加载总超时时间
+const CORE_LOAD_TIMEOUT = 30000; // 30秒
+
+// 最少需要加载成功的核心视频数量（至少1个才能使用）
+const MIN_CORE_VIDEOS_REQUIRED = 1;
+
 // ==================== 视频列表配置 ====================
 
 // 核心视频 - 必须优先加载，保证基本功能
 const CORE_VIDEOS = [
   '/character/idle_action_1.webm',  // 主待机动画
   '/character/happy.webm',           // 说话/开心动画
-  '/character/idle_action_3.webm',   // 左侧待机
 ];
 
 // 常用视频 - 登录后立即加载
 const COMMON_VIDEOS = [
+  '/character/idle_action_3.webm',   // 左侧待机
   '/character/idle_alt.webm',
   '/character/idle_action_4.webm',
   '/character/listening_v2.webm',
-  '/character/thinking.webm',        // 实际是 taking_notes.webm
   '/character/taking_notes.webm',
   '/character/shy.webm',
   '/character/excited.webm',
@@ -121,16 +133,47 @@ class VideoPreloaderService {
   /**
    * 开始预加载核心视频
    * 在登录/注册页面调用，确保进入主界面时核心视频已就绪
+   * 
+   * 容错机制：
+   * - 设置总超时时间，超时后即使未全部加载也标记为就绪
+   * - 只要有 MIN_CORE_VIDEOS_REQUIRED 个视频加载成功就算就绪
    */
   public async preloadCore(onProgress?: PreloadProgressCallback): Promise<void> {
+    if (this.coreReady) {
+      console.log('[VideoPreloader] 核心视频已就绪，跳过预加载');
+      onProgress?.(this.getProgress());
+      return;
+    }
+    
     if (onProgress) {
       this.progressCallbacks.add(onProgress);
     }
     
     console.log('[VideoPreloader] 开始预加载核心视频...');
     
+    // 设置总超时
+    const timeoutPromise = new Promise<void>((resolve) => {
+      setTimeout(() => {
+        console.warn('[VideoPreloader] ⚠️ 核心视频加载超时，继续使用已加载的资源');
+        resolve();
+      }, CORE_LOAD_TIMEOUT);
+    });
+    
     // 先尝试从缓存恢复
     await this.restoreFromCache(CORE_VIDEOS);
+    
+    // 检查已加载数量
+    const loadedCount = CORE_VIDEOS.filter(url => 
+      this.loadStates.get(url)?.status === 'loaded'
+    ).length;
+    
+    if (loadedCount >= MIN_CORE_VIDEOS_REQUIRED) {
+      console.log(`[VideoPreloader] ✓ 核心视频已从缓存恢复 (${loadedCount}/${CORE_VIDEOS.length})`);
+      this.coreReady = true;
+      this.emitProgress();
+      if (onProgress) this.progressCallbacks.delete(onProgress);
+      return;
+    }
     
     // 加载未缓存的核心视频
     const unloadedCore = CORE_VIDEOS.filter(url => {
@@ -138,23 +181,56 @@ class VideoPreloaderService {
       return state?.status !== 'loaded';
     });
     
-    if (unloadedCore.length === 0) {
-      console.log('[VideoPreloader] ✓ 核心视频已全部缓存');
+    // 并行加载，带超时保护
+    const loadPromise = Promise.all(
+      unloadedCore.map(url => this.loadVideoWithTimeout(url, LOAD_TIMEOUT))
+    );
+    
+    // 等待加载完成或超时
+    await Promise.race([loadPromise, timeoutPromise]);
+    
+    // 统计结果
+    const finalLoadedCount = CORE_VIDEOS.filter(url => 
+      this.loadStates.get(url)?.status === 'loaded'
+    ).length;
+    
+    // 只要有足够的核心视频就标记为就绪
+    if (finalLoadedCount >= MIN_CORE_VIDEOS_REQUIRED) {
       this.coreReady = true;
-      this.emitProgress();
-      return;
+      console.log(`[VideoPreloader] ✓ 核心视频加载完成 (${finalLoadedCount}/${CORE_VIDEOS.length})`);
+    } else {
+      // 即使没有加载成功也标记为就绪，让用户可以使用（会使用原始URL）
+      this.coreReady = true;
+      console.warn(`[VideoPreloader] ⚠️ 核心视频加载不完整，但仍允许使用 (${finalLoadedCount}/${CORE_VIDEOS.length})`);
     }
     
-    // 并行加载核心视频
-    await Promise.all(unloadedCore.map(url => this.loadVideo(url)));
-    
-    this.coreReady = true;
-    console.log('[VideoPreloader] ✓ 核心视频加载完成');
     this.emitProgress();
     
     if (onProgress) {
       this.progressCallbacks.delete(onProgress);
     }
+  }
+  
+  /**
+   * 带超时的视频加载
+   */
+  private async loadVideoWithTimeout(url: string, timeout: number): Promise<void> {
+    return new Promise((resolve) => {
+      const timeoutId = setTimeout(() => {
+        const state = this.loadStates.get(url);
+        if (state && state.status === 'loading') {
+          state.status = 'skipped';
+          state.error = '加载超时';
+          console.warn(`[VideoPreloader] ⚠️ 超时跳过: ${url.split('/').pop()}`);
+        }
+        resolve();
+      }, timeout);
+      
+      this.loadVideo(url).finally(() => {
+        clearTimeout(timeoutId);
+        resolve();
+      });
+    });
   }
   
   /**
@@ -288,11 +364,19 @@ class VideoPreloaderService {
   public getProgress(): PreloadProgress {
     const allVideos = [...CORE_VIDEOS, ...COMMON_VIDEOS, ...EXTENDED_VIDEOS];
     const loaded = allVideos.filter(url => this.loadStates.get(url)?.status === 'loaded').length;
+    const failed = allVideos.filter(url => {
+      const status = this.loadStates.get(url)?.status;
+      return status === 'error' || status === 'skipped';
+    }).length;
+    
+    // 计算进度时，失败的也算处理完成
+    const processed = loaded + failed;
     
     return {
       total: allVideos.length,
       loaded,
-      percent: Math.round((loaded / allVideos.length) * 100),
+      failed,
+      percent: Math.round((processed / allVideos.length) * 100),
       coreReady: this.coreReady,
     };
   }
@@ -369,16 +453,36 @@ class VideoPreloaderService {
    */
   private async loadVideo(url: string): Promise<void> {
     const state = this.loadStates.get(url);
-    if (!state) return;
+    if (!state) {
+      // 如果状态不存在，创建一个
+      this.loadStates.set(url, {
+        url,
+        status: 'pending',
+        progress: 0,
+      });
+    }
     
-    // 已加载则跳过
-    if (state.status === 'loaded') return;
+    const currentState = this.loadStates.get(url)!;
     
-    state.status = 'loading';
+    // 已加载或已失败则跳过
+    if (currentState.status === 'loaded' || currentState.status === 'error' || currentState.status === 'skipped') {
+      return;
+    }
+    
+    currentState.status = 'loading';
     this.emitProgress(url);
     
     try {
-      const response = await fetch(url);
+      // 使用 AbortController 实现请求超时
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), LOAD_TIMEOUT);
+      
+      const response = await fetch(url, { 
+        signal: controller.signal,
+        cache: 'force-cache' // 优先使用浏览器缓存
+      });
+      
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -391,23 +495,40 @@ class VideoPreloaderService {
       // 读取响应体
       const reader = response.body?.getReader();
       if (!reader) {
-        throw new Error('无法读取响应体');
+        // 如果无法使用流式读取，使用 arrayBuffer
+        const buffer = await response.arrayBuffer();
+        const blob = new Blob([buffer], { type: 'video/webm' });
+        const objectUrl = URL.createObjectURL(blob);
+        
+        currentState.status = 'loaded';
+        currentState.progress = 100;
+        currentState.blob = blob;
+        currentState.objectUrl = objectUrl;
+        
+        await this.saveToCache(url, blob);
+        console.log(`[VideoPreloader] ✓ 已加载: ${url.split('/').pop()}`);
+        this.emitProgress(url);
+        return;
       }
       
-      const chunks: Uint8Array[] = [];
+      const chunks: BlobPart[] = [];
       let loaded = 0;
       
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         
-        chunks.push(value);
+        // 转换为 ArrayBuffer 以兼容 BlobPart
+        chunks.push(value.buffer.slice(value.byteOffset, value.byteOffset + value.byteLength));
         loaded += value.length;
         
         // 更新进度
         if (total > 0) {
-          state.progress = Math.round((loaded / total) * 100);
-          this.emitProgress(url);
+          currentState.progress = Math.round((loaded / total) * 100);
+          // 不要太频繁触发进度更新
+          if (currentState.progress % 10 === 0) {
+            this.emitProgress(url);
+          }
         }
       }
       
@@ -415,21 +536,21 @@ class VideoPreloaderService {
       const blob = new Blob(chunks, { type: 'video/webm' });
       const objectUrl = URL.createObjectURL(blob);
       
-      state.status = 'loaded';
-      state.progress = 100;
-      state.blob = blob;
-      state.objectUrl = objectUrl;
+      currentState.status = 'loaded';
+      currentState.progress = 100;
+      currentState.blob = blob;
+      currentState.objectUrl = objectUrl;
       
-      // 保存到 Cache API
-      await this.saveToCache(url, blob);
+      // 保存到 Cache API（不阻塞）
+      this.saveToCache(url, blob).catch(() => {});
       
       console.log(`[VideoPreloader] ✓ 已加载: ${url.split('/').pop()}`);
       this.emitProgress(url);
       
     } catch (err: any) {
-      state.status = 'error';
-      state.error = err.message;
-      console.error(`[VideoPreloader] ✗ 加载失败: ${url}`, err.message);
+      currentState.status = 'error';
+      currentState.error = err.name === 'AbortError' ? '加载超时' : err.message;
+      console.warn(`[VideoPreloader] ✗ 加载失败: ${url.split('/').pop()} - ${currentState.error}`);
       this.emitProgress(url);
     }
   }
