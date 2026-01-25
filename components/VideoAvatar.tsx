@@ -91,6 +91,9 @@ const VideoAvatar = forwardRef<VideoAvatarRef, VideoAvatarProps>((props, ref) =>
       setPreloadProgress(progress);
     });
     
+    // 打印缓存状态（帮助调试）
+    videoPreloader.logCacheStatus();
+    
     // 如果核心视频已就绪，开始后台加载全部视频
     if (videoPreloader.isCoreReady()) {
       preloadAllVideos();

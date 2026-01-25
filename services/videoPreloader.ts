@@ -392,6 +392,51 @@ class VideoPreloaderService {
   }
   
   /**
+   * 获取缓存统计信息
+   */
+  public async getCacheStats(): Promise<{ cached: number; total: number; sizeKB: number }> {
+    const allVideos = [...CORE_VIDEOS, ...COMMON_VIDEOS, ...EXTENDED_VIDEOS];
+    let cached = 0;
+    let totalSize = 0;
+    
+    if ('caches' in window) {
+      try {
+        const cache = await caches.open(this.CACHE_NAME);
+        for (const url of allVideos) {
+          const cacheKey = this.getCacheKey(url);
+          const response = await cache.match(cacheKey);
+          if (response) {
+            cached++;
+            const blob = await response.clone().blob();
+            totalSize += blob.size;
+          }
+        }
+      } catch (err) {
+        console.warn('[VideoPreloader] 获取缓存统计失败:', err);
+      }
+    }
+    
+    return {
+      cached,
+      total: allVideos.length,
+      sizeKB: Math.round(totalSize / 1024),
+    };
+  }
+  
+  /**
+   * 打印缓存状态到控制台
+   */
+  public async logCacheStatus(): Promise<void> {
+    const stats = await this.getCacheStats();
+    const loaded = this.getProgress().loaded;
+    
+    console.log(`[VideoPreloader] 📊 缓存状态:`);
+    console.log(`  - 浏览器持久缓存: ${stats.cached}/${stats.total} 个视频 (${stats.sizeKB} KB)`);
+    console.log(`  - 内存缓存: ${loaded}/${stats.total} 个视频`);
+    console.log(`  - 核心视频就绪: ${this.coreReady ? '✓' : '✗'}`);
+  }
+  
+  /**
    * 清除所有缓存
    */
   public async clearCache(): Promise<void> {
@@ -418,10 +463,24 @@ class VideoPreloaderService {
   // ==================== 内部方法 ====================
   
   /**
+   * 获取完整的缓存键（确保一致性）
+   */
+  private getCacheKey(url: string): string {
+    // 将相对路径转换为完整 URL，确保缓存键一致
+    if (url.startsWith('/')) {
+      return new URL(url, window.location.origin).href;
+    }
+    return url;
+  }
+  
+  /**
    * 从 Cache API 恢复视频
    */
   private async restoreFromCache(urls: string[]): Promise<void> {
-    if (!('caches' in window)) return;
+    if (!('caches' in window)) {
+      console.log('[VideoPreloader] 浏览器不支持 Cache API');
+      return;
+    }
     
     try {
       const cache = await caches.open(this.CACHE_NAME);
@@ -430,7 +489,10 @@ class VideoPreloaderService {
         const state = this.loadStates.get(url);
         if (!state || state.status === 'loaded') continue;
         
-        const response = await cache.match(url);
+        // 使用完整 URL 作为缓存键
+        const cacheKey = this.getCacheKey(url);
+        const response = await cache.match(cacheKey);
+        
         if (response) {
           const blob = await response.blob();
           const objectUrl = URL.createObjectURL(blob);
@@ -440,7 +502,7 @@ class VideoPreloaderService {
           state.blob = blob;
           state.objectUrl = objectUrl;
           
-          console.log(`[VideoPreloader] 从缓存恢复: ${url}`);
+          console.log(`[VideoPreloader] ✓ 从浏览器缓存恢复: ${url.split('/').pop()}`);
         }
       }
     } catch (err) {
@@ -566,7 +628,10 @@ class VideoPreloaderService {
       const response = new Response(blob, {
         headers: { 'Content-Type': 'video/webm' }
       });
-      await cache.put(url, response);
+      // 使用完整 URL 作为缓存键，确保与恢复时一致
+      const cacheKey = this.getCacheKey(url);
+      await cache.put(cacheKey, response);
+      console.log(`[VideoPreloader] 💾 已缓存到浏览器: ${url.split('/').pop()}`);
     } catch (err) {
       console.warn(`[VideoPreloader] 缓存保存失败: ${url}`, err);
     }

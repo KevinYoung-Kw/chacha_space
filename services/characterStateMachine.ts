@@ -447,7 +447,7 @@ export class VirtualCharacterStateMachine {
     const cachedUrl = videoPreloader.getVideoUrl(state.videoSource);
     if (cachedUrl) {
       buffer.element.src = cachedUrl;
-      buffer.isReady = true;
+      // 注意：不要在这里设置 isReady = true，等待视频元素真正准备好
       console.log(`[StateMachine] 使用缓存视频: ${state.videoSource.split('/').pop()}`);
     }
     // 其次检查本地预加载缓存
@@ -455,9 +455,8 @@ export class VirtualCharacterStateMachine {
       const cachedVideo = this.preloadCache.get(stateID);
       if (cachedVideo && cachedVideo.readyState >= 3) {
         buffer.element.src = cachedVideo.src;
-        buffer.isReady = true;
       } else {
-        // 按需加载视频
+        // 按需加载视频（直接使用原始 URL）
         buffer.element.src = state.videoSource;
         // 异步触发预加载服务加载此视频（供下次使用）
         loadVideoOnDemand(state.videoSource).catch(() => {});
@@ -477,6 +476,13 @@ export class VirtualCharacterStateMachine {
    */
   private async transitionTo(targetStateID: VideoStateID, isInterrupt: boolean = false, retryCount: number = 0): Promise<void> {
     const MAX_RETRIES = 2;
+    
+    // 防止递归过深
+    if (retryCount > MAX_RETRIES) {
+      console.warn('[StateMachine] 达到最大重试次数，停止切换');
+      this.interruptFlag = false;
+      return;
+    }
     
     // 获取目标状态配置
     const targetState = this.config.states.get(targetStateID);
@@ -509,38 +515,43 @@ export class VirtualCharacterStateMachine {
     // 预加载下一个视频到待命缓冲区
     this.loadVideoToBuffer(nextBuffer, targetStateID);
 
-    // 等待下一个视频准备就绪（使用较短的超时时间）
-    await this.waitForVideoReady(nextBuffer, 3000);
+    // 等待下一个视频准备就绪（增加超时时间到 5 秒）
+    await this.waitForVideoReady(nextBuffer, 5000);
 
     // 检查视频是否真的准备好了
-    if (nextBuffer.element.error || nextBuffer.element.readyState < 2) {
-      console.warn(`[StateMachine] 视频加载失败或未就绪: ${targetState.videoSource.split('/').pop()}`);
+    if (nextBuffer.element.error || !nextBuffer.isReady) {
+      console.warn(`[StateMachine] 视频加载失败: ${targetState.videoSource.split('/').pop()}`);
       
       // 如果当前 buffer 还在正常播放，就保持当前状态
-      if (currentBuffer.element && !currentBuffer.element.error && !currentBuffer.element.paused) {
+      if (currentBuffer.element && !currentBuffer.element.error && 
+          currentBuffer.element.readyState >= 2 && !currentBuffer.element.paused) {
         console.log('[StateMachine] 保持当前状态，当前视频仍在播放');
         this.interruptFlag = false;
         return;
       }
       
-      // 如果目标状态是 IDLE_CENTER 且已达到最大重试次数，就不再重试
-      if (targetStateID === VideoStateID.IDLE_CENTER && retryCount >= MAX_RETRIES) {
-        console.warn('[StateMachine] IDLE_CENTER 加载失败，尝试使用原始 URL');
-        // 最后的尝试：直接使用原始 URL（不通过缓存）
-        nextBuffer.element.src = targetState.videoSource;
-        nextBuffer.element.load();
-        this.interruptFlag = false;
+      // 查找一个已加载的回退动画
+      const fallbackState = this.getFallbackAnimation();
+      if (fallbackState && fallbackState !== targetStateID) {
+        console.log(`[StateMachine] 使用回退动画: ${fallbackState}`);
+        setTimeout(() => {
+          this.transitionTo(fallbackState, true, retryCount + 1);
+        }, 50);
         return;
       }
       
-      // 尝试回退到 idle 状态
-      if (targetStateID !== VideoStateID.IDLE_CENTER) {
-        console.log('[StateMachine] 尝试回退到 IDLE_CENTER');
-        setTimeout(() => {
-          this.transitionTo(VideoStateID.IDLE_CENTER, true, retryCount + 1);
-        }, 100);
+      // 最后的尝试：直接使用原始 URL
+      console.warn('[StateMachine] 尝试直接使用原始 URL');
+      nextBuffer.element.src = targetState.videoSource;
+      nextBuffer.element.load();
+      
+      // 再等待一次
+      await this.waitForVideoReady(nextBuffer, 3000);
+      if (!nextBuffer.isReady) {
+        console.error('[StateMachine] 视频加载彻底失败，放弃切换');
+        this.interruptFlag = false;
+        return;
       }
-      return;
     }
 
     // 检查是否被新的打断取消
@@ -592,9 +603,9 @@ export class VirtualCharacterStateMachine {
    * 等待视频准备就绪
    */
   private waitForVideoReady(buffer: VideoBuffer, timeout: number): Promise<void> {
-    return new Promise((resolve, reject) => {
-      // 如果已经准备好，立即返回
-      if (buffer.isReady || buffer.element.readyState >= 3) {
+    return new Promise((resolve) => {
+      // 如果已经准备好（readyState >= 2 表示有足够数据开始播放）
+      if (buffer.element.readyState >= 2) {
         buffer.isReady = true;
         resolve();
         return;
@@ -602,9 +613,9 @@ export class VirtualCharacterStateMachine {
 
       let resolved = false;
       
-      // 监听 canplay 事件
-      const onCanPlay = () => {
-        if (!resolved) {
+      // 监听多个事件
+      const onReady = () => {
+        if (!resolved && buffer.element.readyState >= 2) {
           resolved = true;
           buffer.isReady = true;
           cleanup();
@@ -613,53 +624,144 @@ export class VirtualCharacterStateMachine {
       };
 
       // 监听错误事件
-      const onError = (e: Event) => {
+      const onError = () => {
         if (!resolved) {
           resolved = true;
+          buffer.isReady = false;
           cleanup();
-          // 即使出错也resolve，让上层决定如何处理
           resolve();
         }
       };
 
       const cleanup = () => {
-        buffer.element.removeEventListener('canplay', onCanPlay);
+        buffer.element.removeEventListener('canplay', onReady);
+        buffer.element.removeEventListener('canplaythrough', onReady);
+        buffer.element.removeEventListener('loadeddata', onReady);
         buffer.element.removeEventListener('error', onError);
       };
 
-      buffer.element.addEventListener('canplay', onCanPlay, { once: true });
-      buffer.element.addEventListener('error', onError, { once: true });
+      buffer.element.addEventListener('canplay', onReady);
+      buffer.element.addEventListener('canplaythrough', onReady);
+      buffer.element.addEventListener('loadeddata', onReady);
+      buffer.element.addEventListener('error', onError);
 
-      // 超时保护 - 增加超时时间到5秒
+      // 超时保护
       setTimeout(() => {
         if (!resolved) {
           resolved = true;
           cleanup();
-          // 即使超时也标记为ready，尝试播放
-          buffer.isReady = buffer.element.readyState >= 2; // 至少有当前帧数据
+          // 超时时检查当前状态
+          buffer.isReady = buffer.element.readyState >= 2;
           resolve();
         }
       }, timeout);
 
-      // 轮询检查（作为备用）
-      const checkReady = () => {
-        if (resolved) return;
-        
-        if (buffer.element.readyState >= 3) {
-          resolved = true;
-          buffer.isReady = true;
-          cleanup();
-          resolve();
+      // 轮询检查（作为备用，每100ms检查一次）
+      const checkInterval = setInterval(() => {
+        if (resolved) {
+          clearInterval(checkInterval);
           return;
         }
         
-        if (!resolved) {
-          requestAnimationFrame(checkReady);
+        if (buffer.element.readyState >= 2) {
+          resolved = true;
+          buffer.isReady = true;
+          cleanup();
+          clearInterval(checkInterval);
+          resolve();
         }
-      };
-      
-      checkReady();
+      }, 100);
     });
+  }
+  
+  /**
+   * 获取一个已加载的回退动画
+   * 用于当目标动画加载失败时
+   */
+  private getFallbackAnimation(): VideoStateID | null {
+    // 优先级列表：优先选择已缓存的动画
+    const fallbackOrder: VideoStateID[] = [
+      VideoStateID.IDLE_CENTER,
+      VideoStateID.ACTION_IDLE_1,
+      VideoStateID.ACTION_HAPPY,
+      VideoStateID.ACTION_IDLE_ALT,
+      VideoStateID.ACTION_IDLE_3,
+    ];
+    
+    for (const stateID of fallbackOrder) {
+      const state = this.config.states.get(stateID);
+      if (state && videoPreloader.isVideoLoaded(state.videoSource)) {
+        return stateID;
+      }
+    }
+    
+    // 如果没有缓存的动画，返回 IDLE_CENTER（会直接使用原始 URL）
+    return VideoStateID.IDLE_CENTER;
+  }
+  
+  /**
+   * 根据动作类型查找已缓存的替代动画
+   * 会尝试找同类型的已缓存动画
+   */
+  private findCachedAlternative(actionName: string, actionMap: Record<string, VideoStateID>): VideoStateID | null {
+    // 定义动作分类和替代优先级
+    const actionCategories: Record<string, string[]> = {
+      // 正面情绪
+      positive: ['happy', 'excited', 'jump', 'dancing', 'dancing_2', 'singing'],
+      // 负面情绪
+      negative: ['shy', 'crying', 'scared', 'angry', 'rage', 'disapprove', 'shouting'],
+      // 待机/倾听
+      idle: ['idle_1', 'idle_3', 'idle_4', 'idle_alt', 'listening_v2', 'observing'],
+      // 说话/思考
+      speaking: ['speaking', 'thinking', 'happy', 'nod'],
+      // 功能性动作
+      functional: ['weather', 'tarot_reading', 'notes', 'check_phone', 'phone', 'drinking_water'],
+    };
+    
+    // 找到当前动作所属的分类
+    let category: string | null = null;
+    for (const [cat, actions] of Object.entries(actionCategories)) {
+      if (actions.includes(actionName)) {
+        category = cat;
+        break;
+      }
+    }
+    
+    // 如果找不到分类，默认使用 speaking 分类
+    if (!category) {
+      category = 'speaking';
+    }
+    
+    // 在同分类中查找已缓存的动画
+    const categoryActions = actionCategories[category] || [];
+    for (const altAction of categoryActions) {
+      if (altAction === actionName) continue; // 跳过原动作
+      
+      const altStateID = actionMap[altAction];
+      if (!altStateID) continue;
+      
+      const altState = this.config.states.get(altStateID);
+      if (altState && videoPreloader.isVideoLoaded(altState.videoSource)) {
+        return altStateID;
+      }
+    }
+    
+    // 如果同分类没有找到，尝试使用通用的替代动画
+    const universalFallbacks: VideoStateID[] = [
+      VideoStateID.ACTION_HAPPY,
+      VideoStateID.ACTION_IDLE_1,
+      VideoStateID.ACTION_LISTENING_V2,
+    ];
+    
+    for (const fallbackID of universalFallbacks) {
+      const fallbackState = this.config.states.get(fallbackID);
+      if (fallbackState && videoPreloader.isVideoLoaded(fallbackState.videoSource)) {
+        return fallbackID;
+      }
+    }
+    
+    // 没有找到合适的替代，返回 null（让调用者使用原始动画）
+    return null;
   }
 
   /**
@@ -874,16 +976,27 @@ export class VirtualCharacterStateMachine {
       'observing': VideoStateID.ACTION_OBSERVING,
     };
 
-    const actionStateID = actionMap[actionName];
+    let actionStateID = actionMap[actionName];
     if (!actionStateID) {
-      return;
+      console.warn(`[StateMachine] 未知动作: ${actionName}，使用默认动画`);
+      actionStateID = VideoStateID.ACTION_HAPPY; // 默认使用 happy 动画
     }
 
     // 检查状态是否存在
-    const actionState = this.config.states.get(actionStateID);
+    let actionState = this.config.states.get(actionStateID);
     if (!actionState) {
       console.warn(`[StateMachine] 动作状态 ${actionStateID} 未配置`);
       return;
+    }
+    
+    // 检查目标动画是否已缓存，如果未缓存则选择替代动画
+    if (!videoPreloader.isVideoLoaded(actionState.videoSource)) {
+      const fallbackAction = this.findCachedAlternative(actionName, actionMap);
+      if (fallbackAction && fallbackAction !== actionStateID) {
+        console.log(`[StateMachine] 动画 ${actionName} 未缓存，使用替代: ${fallbackAction}`);
+        actionStateID = fallbackAction;
+        actionState = this.config.states.get(actionStateID)!;
+      }
     }
 
     // 修改动作状态的 nextStateID 为当前待机状态
