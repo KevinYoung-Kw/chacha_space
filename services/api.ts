@@ -702,6 +702,226 @@ export const memoryApi = {
   },
 };
 
+// ==================== 管理员 API ====================
+
+// 管理员 Token 管理（独立于普通用户）
+let adminToken: string | null = null;
+
+export function setAdminToken(token: string | null): void {
+  adminToken = token;
+  if (token) {
+    localStorage.setItem('chacha_admin_token', token);
+  } else {
+    localStorage.removeItem('chacha_admin_token');
+  }
+}
+
+export function getAdminToken(): string | null {
+  if (!adminToken) {
+    adminToken = localStorage.getItem('chacha_admin_token');
+  }
+  return adminToken;
+}
+
+export function clearAdminAuth(): void {
+  adminToken = null;
+  localStorage.removeItem('chacha_admin_token');
+}
+
+// 管理员专用请求方法
+async function adminRequest<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<ApiResponse<T>> {
+  const token = getAdminToken();
+  
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+  
+  if (token) {
+    (headers as Record<string, string>)['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+    });
+
+    if (response.status === 401) {
+      clearAdminAuth();
+      return {
+        success: false,
+        error: '管理员登录已过期',
+      };
+    }
+
+    if (response.status === 403) {
+      return {
+        success: false,
+        error: '没有管理员权限',
+      };
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error(`[AdminAPI] Request error: ${endpoint}`, error);
+    return {
+      success: false,
+      error: '网络请求失败',
+    };
+  }
+}
+
+export interface AdminStats {
+  users: { total: number; today: number; week: number };
+  inviteCodes: { total: number; used: number; available: number };
+  todos: { total: number; completed: number };
+  chats: { totalMessages: number; totalSessions: number };
+  recentUsers: Array<{ id: string; email: string; name: string; created_at: string }>;
+}
+
+export interface InviteCode {
+  code: string;
+  created_at: string;
+  used_at: string | null;
+  expires_at: string | null;
+  used_by_email: string | null;
+  used_by_name: string | null;
+}
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+  gender: string | null;
+  created_at: string;
+  affinity_value: number | null;
+  affinity_level: string | null;
+  todo_count: number;
+  message_count: number;
+}
+
+export interface Pagination {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
+
+export const adminApi = {
+  /**
+   * 管理员登录
+   */
+  async login(email: string, password: string): Promise<ApiResponse<{ token: string; user: any }>> {
+    const result = await adminRequest<{ token: string; user: any }>('/admin/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+    
+    if (result.success && result.data) {
+      setAdminToken(result.data.token);
+    }
+    
+    return result;
+  },
+
+  /**
+   * 登出
+   */
+  logout(): void {
+    clearAdminAuth();
+  },
+
+  /**
+   * 检查是否已登录
+   */
+  isAuthenticated(): boolean {
+    return !!getAdminToken();
+  },
+
+  /**
+   * 获取统计数据
+   */
+  async getStats(): Promise<ApiResponse<AdminStats>> {
+    return adminRequest<AdminStats>('/admin/stats');
+  },
+
+  /**
+   * 获取邀请码列表
+   */
+  async getInviteCodes(params?: { 
+    page?: number; 
+    pageSize?: number; 
+    status?: 'all' | 'used' | 'available' 
+  }): Promise<ApiResponse<{ inviteCodes: InviteCode[]; pagination: Pagination }>> {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize));
+    if (params?.status) query.set('status', params.status);
+    
+    return adminRequest<{ inviteCodes: InviteCode[]; pagination: Pagination }>(
+      `/admin/invite-codes?${query.toString()}`
+    );
+  },
+
+  /**
+   * 生成邀请码
+   */
+  async generateInviteCodes(count: number = 10): Promise<ApiResponse<{ codes: string[]; count: number }>> {
+    return adminRequest<{ codes: string[]; count: number }>('/admin/invite-codes', {
+      method: 'POST',
+      body: JSON.stringify({ count }),
+    });
+  },
+
+  /**
+   * 删除邀请码
+   */
+  async deleteInviteCode(code: string): Promise<ApiResponse<void>> {
+    return adminRequest<void>(`/admin/invite-codes/${code}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * 获取用户列表
+   */
+  async getUsers(params?: { 
+    page?: number; 
+    pageSize?: number; 
+    search?: string 
+  }): Promise<ApiResponse<{ users: AdminUser[]; pagination: Pagination }>> {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize));
+    if (params?.search) query.set('search', params.search);
+    
+    return adminRequest<{ users: AdminUser[]; pagination: Pagination }>(
+      `/admin/users?${query.toString()}`
+    );
+  },
+
+  /**
+   * 删除用户
+   */
+  async deleteUser(id: string): Promise<ApiResponse<void>> {
+    return adminRequest<void>(`/admin/users/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  /**
+   * 获取用户详情
+   */
+  async getUserDetail(id: string): Promise<ApiResponse<any>> {
+    return adminRequest<any>(`/admin/users/${id}`);
+  },
+};
+
 // ==================== 导出所有 API ====================
 
 export const api = {
@@ -714,6 +934,7 @@ export const api = {
   tts: ttsApi,
   memory: memoryApi,
   emotion: emotionApi,
+  admin: adminApi,
 };
 
 export default api;

@@ -50,6 +50,12 @@ export const config = {
     origin: process.env.CORS_ORIGIN || '*',
     credentials: true,
   },
+  
+  // 管理员配置
+  admin: {
+    email: process.env.ADMIN_EMAIL || '',
+    password: process.env.ADMIN_PASSWORD || '',
+  },
 };
 
 export default config;

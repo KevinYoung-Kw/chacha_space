@@ -54,6 +54,13 @@ MINIMAX_GROUP_ID=你的实际GroupID
 # 可以用这个命令生成: openssl rand -hex 32
 JWT_SECRET=你生成的随机密钥
 
+# ==================== 管理员配置 ====================
+
+# 管理后台账户（推荐配置）
+# 配置后可通过 /admin 访问管理后台
+ADMIN_EMAIL=admin@yourdomain.com
+ADMIN_PASSWORD=你的管理员密码
+
 # ==================== 可选配置 ====================
 
 # 高德地图 API（可选）

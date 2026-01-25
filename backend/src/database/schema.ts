@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
   gender TEXT,
   identity TEXT,
   expectations TEXT,
+  is_admin INTEGER DEFAULT 0,  -- 是否为管理员
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now'))
 );

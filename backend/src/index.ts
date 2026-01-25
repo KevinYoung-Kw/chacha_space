@@ -23,6 +23,12 @@ import sttRoutes from './routes/stt';
 import memoryRoutes from './routes/memory';
 import emotionRoutes from './routes/emotion';
 import affinityRoutes from './routes/affinity';
+import adminRoutes from './routes/admin';
+
+// 导入工具
+import bcrypt from 'bcryptjs';
+import { v4 as uuidv4 } from 'uuid';
+import { db } from './database/db';
 
 // 创建 Express 应用
 const app = express();
@@ -62,6 +68,7 @@ app.use('/api', sttRoutes);
 app.use('/api/memories', memoryRoutes);
 app.use('/api/emotion', emotionRoutes);
 app.use('/api/affinity', affinityRoutes);
+app.use('/api/admin', adminRoutes);
 
 // ==================== 健康检查 ====================
 
@@ -124,6 +131,54 @@ app.use((req, res) => {
   });
 });
 
+// ==================== 管理员初始化 ====================
+
+/**
+ * 自动创建或更新管理员账户
+ * 根据环境变量 ADMIN_EMAIL 和 ADMIN_PASSWORD 配置
+ */
+async function initializeAdmin(): Promise<void> {
+  const { email, password } = config.admin;
+  
+  if (!email || !password) {
+    console.log('[Admin] ⚠️  未配置管理员账户（ADMIN_EMAIL 和 ADMIN_PASSWORD）');
+    return;
+  }
+  
+  if (password.length < 6) {
+    console.log('[Admin] ⚠️  管理员密码太短（至少6位），跳过创建');
+    return;
+  }
+  
+  try {
+    // 检查管理员是否存在
+    const existingAdmin = db.prepare(`
+      SELECT id, password_hash FROM users WHERE email = ?
+    `).get(email) as { id: string; password_hash: string } | undefined;
+    
+    const passwordHash = await bcrypt.hash(password, 10);
+    
+    if (existingAdmin) {
+      // 更新密码和管理员标志
+      db.prepare(`
+        UPDATE users SET password_hash = ?, is_admin = 1, updated_at = datetime('now')
+        WHERE email = ?
+      `).run(passwordHash, email);
+      console.log(`[Admin] ✓ 管理员账户已更新: ${email}`);
+    } else {
+      // 创建新管理员
+      const adminId = uuidv4();
+      db.prepare(`
+        INSERT INTO users (id, email, password_hash, name, is_admin, created_at, updated_at)
+        VALUES (?, ?, ?, '管理员', 1, datetime('now'), datetime('now'))
+      `).run(adminId, email, passwordHash);
+      console.log(`[Admin] ✓ 管理员账户已创建: ${email}`);
+    }
+  } catch (error) {
+    console.error('[Admin] ✗ 管理员初始化失败:', error);
+  }
+}
+
 // ==================== 启动服务器 ====================
 
 async function start() {
@@ -139,6 +194,7 @@ async function start() {
     console.log(`   MINIMAX_GROUP_ID: ${config.minimax.groupId ? '✓ 已配置' : '✗ 未配置'}`);
     console.log(`   AMAP_KEY: ${config.amap.apiKey ? '✓ 已配置' : '- 未配置（可选）'}`);
     console.log(`   STEPFUN_API_KEY: ${config.stepfun.apiKey ? '✓ 已配置' : '- 未配置（可选）'}`);
+    console.log(`   ADMIN_EMAIL: ${config.admin.email ? '✓ 已配置' : '- 未配置'}`);
     console.log(`   CORS_ORIGIN: ${config.cors.origin}`);
     
     // 检查必需的环境变量
@@ -162,6 +218,9 @@ async function start() {
     initDatabase();
     console.log('✅ 数据库初始化完成');
 
+    // 初始化管理员账户
+    await initializeAdmin();
+
     // 启动服务器
     app.listen(config.port, () => {
       console.log('');
@@ -178,7 +237,6 @@ async function start() {
       console.log('📋 可用的 API 端点:');
       console.log('  POST   /api/auth/register          - 用户注册（需邀请码）');
       console.log('  POST   /api/auth/login             - 用户登录');
-      console.log('  POST   /api/auth/generate-invite   - 生成邀请码（仅本地）');
       console.log('  GET    /api/auth/profile           - 获取用户信息');
       console.log('  POST   /api/chat/message           - AI 对话');
       console.log('  GET    /api/todos                  - 获取待办列表');
@@ -190,10 +248,21 @@ async function start() {
       console.log('  GET    /api/affinity               - 获取好感度');
       console.log('  GET    /api/health-check           - 健康检查');
       console.log('');
+      console.log('🔐 管理员 API 端点:');
+      console.log('  POST   /api/admin/login            - 管理员登录');
+      console.log('  GET    /api/admin/stats            - 获取统计数据');
+      console.log('  GET    /api/admin/invite-codes     - 获取邀请码列表');
+      console.log('  POST   /api/admin/invite-codes     - 生成邀请码');
+      console.log('  DELETE /api/admin/invite-codes/:code - 删除邀请码');
+      console.log('  GET    /api/admin/users            - 获取用户列表');
+      console.log('  DELETE /api/admin/users/:id        - 删除用户');
+      console.log('');
       
-      if (config.nodeEnv === 'production') {
-        console.log('💡 提示: 生成邀请码请在服务器本地执行：');
-        console.log('   ./generate-invite-codes.sh -c 10');
+      if (config.admin.email) {
+        console.log(`💡 管理后台: ${config.nodeEnv === 'production' ? '访问 /admin' : `http://localhost:${config.port}/admin`}`);
+        console.log('');
+      } else {
+        console.log('💡 提示: 配置 ADMIN_EMAIL 和 ADMIN_PASSWORD 环境变量启用管理后台');
         console.log('');
       }
     });
