@@ -407,7 +407,14 @@ const hexToArrayBuffer = (hex: string): ArrayBuffer => {
 export async function generateSpeech(text: string, voiceId?: string): Promise<ArrayBuffer | null> {
   const apiKey = config.minimax.apiKey;
   if (!apiKey) {
-    console.error('[MiniMax TTS] API Key 未配置');
+    console.error('[MiniMax TTS] ❌ MINIMAX_API_KEY 未配置！');
+    console.error('[MiniMax TTS] 请在 docker-compose.yml 或 .env 文件中设置 MINIMAX_API_KEY');
+    return null;
+  }
+  
+  if (!config.minimax.groupId) {
+    console.error('[MiniMax TTS] ❌ MINIMAX_GROUP_ID 未配置！');
+    console.error('[MiniMax TTS] 请在 docker-compose.yml 或 .env 文件中设置 MINIMAX_GROUP_ID');
     return null;
   }
 

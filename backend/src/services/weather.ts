@@ -121,24 +121,42 @@ export async function getWeatherByLocation(lat: number, lng: number): Promise<We
 
 /**
  * 根据 IP 获取天气
+ * 如果 IP 定位失败，返回默认城市（北京）的天气
  */
 export async function getWeatherByIP(): Promise<WeatherData | null> {
   try {
+    console.log('[Weather] 尝试通过 IP 获取位置...');
     const ipRes = await fetch('https://ipapi.co/json/', {
       signal: AbortSignal.timeout(5000)
     });
 
-    if (!ipRes.ok) return null;
+    if (!ipRes.ok) {
+      console.warn('[Weather] IP 定位服务响应异常:', ipRes.status);
+      // 返回默认城市天气
+      return await getWeatherForCity('北京');
+    }
 
     const ipData = await ipRes.json() as any;
+    console.log('[Weather] IP 定位结果:', ipData.city || '未知城市');
 
     if (ipData.city) {
       return await getWeatherForCity(ipData.city);
     } else if (ipData.latitude && ipData.longitude) {
       return await getWeatherByLocation(ipData.latitude, ipData.longitude);
     }
-  } catch (e) {
-    console.warn("IP Geo failed:", e);
+    
+    // 如果无法获取位置，返回默认城市
+    console.log('[Weather] 无法从 IP 获取位置，使用默认城市');
+    return await getWeatherForCity('北京');
+  } catch (e: any) {
+    console.warn("[Weather] IP 定位失败:", e?.message || e);
+    // 返回默认城市天气，而不是 null
+    try {
+      console.log('[Weather] 使用默认城市（北京）');
+      return await getWeatherForCity('北京');
+    } catch (fallbackError) {
+      console.error('[Weather] 默认城市天气也获取失败:', fallbackError);
+      return null;
+    }
   }
-  return null;
 }

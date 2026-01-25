@@ -8,7 +8,10 @@
  * 4. 支持强制打断和自动跳转
  * 5. 空闲检测 - 长时间不操作自动播放睡觉/随机待机动画
  * 6. 智能情绪选择 - 根据用户输入选择合适的动画
+ * 7. 集成视频预加载服务，优先使用缓存的视频
  */
+
+import { videoPreloader, loadVideoOnDemand } from './videoPreloader';
 
 // ==================== 类型定义 ====================
 
@@ -395,29 +398,40 @@ export class VirtualCharacterStateMachine {
 
   /**
    * 预加载相邻状态视频
+   * 优先使用全局预加载服务
    */
   private preloadAdjacentStates(stateID: VideoStateID): void {
     const state = this.config.states.get(stateID);
     if (!state?.preloadStates) return;
 
     state.preloadStates.forEach(preloadStateID => {
+      // 如果本地缓存已有，跳过
       if (this.preloadCache.has(preloadStateID)) return;
 
       const preloadState = this.config.states.get(preloadStateID);
       if (!preloadState) return;
 
-      const preloadVideo = document.createElement('video');
-      preloadVideo.src = preloadState.videoSource;
-      preloadVideo.preload = 'auto';
-      preloadVideo.muted = true;
-      preloadVideo.load();
+      // 检查全局预加载服务是否已缓存
+      if (videoPreloader.isVideoLoaded(preloadState.videoSource)) {
+        return; // 已由全局服务缓存
+      }
 
-      this.preloadCache.set(preloadStateID, preloadVideo);
+      // 触发全局预加载服务按需加载
+      loadVideoOnDemand(preloadState.videoSource).catch(() => {
+        // 如果全局服务加载失败，回退到本地预加载
+        const preloadVideo = document.createElement('video');
+        preloadVideo.src = preloadState.videoSource;
+        preloadVideo.preload = 'auto';
+        preloadVideo.muted = true;
+        preloadVideo.load();
+        this.preloadCache.set(preloadStateID, preloadVideo);
+      });
     });
   }
 
   /**
    * 加载视频到缓冲区
+   * 优先使用预加载服务缓存的视频
    */
   private loadVideoToBuffer(buffer: VideoBuffer, stateID: VideoStateID): void {
     const state = this.config.states.get(stateID);
@@ -429,14 +443,25 @@ export class VirtualCharacterStateMachine {
     buffer.isReady = false;
     buffer.element.loop = state.isLoop;
     
-    // 检查预加载缓存
-    const cachedVideo = this.preloadCache.get(stateID);
-    if (cachedVideo && cachedVideo.readyState >= 3) {
-      // 使用预加载的视频源
-      buffer.element.src = cachedVideo.src;
+    // 优先检查全局预加载服务的缓存
+    const cachedUrl = videoPreloader.getVideoUrl(state.videoSource);
+    if (cachedUrl) {
+      buffer.element.src = cachedUrl;
       buffer.isReady = true;
-    } else {
-      buffer.element.src = state.videoSource;
+      console.log(`[StateMachine] 使用缓存视频: ${state.videoSource.split('/').pop()}`);
+    }
+    // 其次检查本地预加载缓存
+    else {
+      const cachedVideo = this.preloadCache.get(stateID);
+      if (cachedVideo && cachedVideo.readyState >= 3) {
+        buffer.element.src = cachedVideo.src;
+        buffer.isReady = true;
+      } else {
+        // 按需加载视频
+        buffer.element.src = state.videoSource;
+        // 异步触发预加载服务加载此视频（供下次使用）
+        loadVideoOnDemand(state.videoSource).catch(() => {});
+      }
     }
     
     buffer.element.load();

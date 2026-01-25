@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Mail, Lock, User, Key, Eye, EyeOff } from 'lucide-react';
 import { setAuthToken } from '../services/api';
+import { preloadCoreVideos, PreloadProgress } from '../services/videoPreloader';
 
 interface AuthModalProps {
   onSuccess: (token: string, user: any) => void;
@@ -13,6 +14,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  
+  // 视频预加载状态
+  const [preloadProgress, setPreloadProgress] = useState<PreloadProgress>({
+    total: 0,
+    loaded: 0,
+    percent: 0,
+    coreReady: false,
+  });
+
+  // 登录页面显示时，开始预加载核心视频
+  useEffect(() => {
+    console.log('[AuthModal] 开始预加载核心视频资源...');
+    preloadCoreVideos((progress) => {
+      setPreloadProgress(progress);
+    }).then(() => {
+      console.log('[AuthModal] ✓ 核心视频预加载完成');
+    }).catch((err) => {
+      console.error('[AuthModal] 视频预加载失败:', err);
+    });
+  }, []);
 
   // 注册表单
   const [registerForm, setRegisterForm] = useState({
@@ -285,6 +306,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
             >
               {isLoading ? '注册中...' : '开始探索'}
             </button>
+            
+            {/* 预加载进度提示 */}
+            {!preloadProgress.coreReady && (
+              <div className="mt-3 flex items-center justify-center gap-2 text-xs text-[#a89b8c]">
+                <div className="w-3 h-3 border-2 border-[#8b7b6d] border-t-transparent rounded-full animate-spin" />
+                <span>正在准备虚拟形象资源... {preloadProgress.percent}%</span>
+              </div>
+            )}
+            {preloadProgress.coreReady && (
+              <div className="mt-3 flex items-center justify-center gap-2 text-xs text-green-600">
+                <span>✓</span>
+                <span>虚拟形象已准备就绪</span>
+              </div>
+            )}
           </form>
         )}
 
@@ -338,6 +373,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
             >
               {isLoading ? '登录中...' : '进入空间'}
             </button>
+            
+            {/* 预加载进度提示 */}
+            {!preloadProgress.coreReady && (
+              <div className="mt-3 flex items-center justify-center gap-2 text-xs text-[#a89b8c]">
+                <div className="w-3 h-3 border-2 border-[#8b7b6d] border-t-transparent rounded-full animate-spin" />
+                <span>正在准备虚拟形象资源... {preloadProgress.percent}%</span>
+              </div>
+            )}
+            {preloadProgress.coreReady && (
+              <div className="mt-3 flex items-center justify-center gap-2 text-xs text-green-600">
+                <span>✓</span>
+                <span>虚拟形象已准备就绪</span>
+              </div>
+            )}
           </form>
         )}
 

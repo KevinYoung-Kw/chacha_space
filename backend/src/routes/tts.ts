@@ -40,10 +40,10 @@ router.post('/synthesize', async (req: Request, res: Response) => {
     const audioBuffer = await generateSpeech(text, voiceId);
 
     if (!audioBuffer) {
-      console.error('[TTS] 语音合成失败 - MiniMax API 返回空数据');
+      console.error('[TTS] 语音合成失败 - 请检查后端日志中的 [MiniMax TTS] 错误信息');
       return res.status(500).json({
         success: false,
-        error: '语音合成失败，请检查 API 配置'
+        error: '语音合成失败 - 请检查服务器日志确认 MINIMAX_API_KEY 是否配置正确'
       });
     }
 

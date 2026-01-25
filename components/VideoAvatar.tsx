@@ -3,11 +3,13 @@
  * 
  * 使用双缓冲策略实现无缝视频切换
  * 支持面板联动和一次性动作播放
+ * 集成视频预加载服务，显示加载进度
  */
 
-import React, { useEffect, useImperativeHandle, forwardRef, useCallback } from 'react';
+import React, { useEffect, useImperativeHandle, forwardRef, useCallback, useState } from 'react';
 import { useCharacterStateMachine, StateUtils } from '../hooks/useCharacterStateMachine';
 import { VideoStateID, StateChangeEvent, StateMachineConfig } from '../services/characterStateMachine';
+import { videoPreloader, preloadAllVideos, PreloadProgress } from '../services/videoPreloader';
 import { Smile, RefreshCw, Sparkles, Drama } from 'lucide-react';
 
 // ==================== 类型定义 ====================
@@ -58,6 +60,14 @@ const VideoAvatar = forwardRef<VideoAvatarRef, VideoAvatarProps>((props, ref) =>
     debug = false 
   } = props;
 
+  // 预加载进度状态
+  const [preloadProgress, setPreloadProgress] = useState<PreloadProgress>({
+    total: 0,
+    loaded: 0,
+    percent: 0,
+    coreReady: videoPreloader.isCoreReady(),
+  });
+
   const {
     containerRef,
     currentState,
@@ -74,6 +84,20 @@ const VideoAvatar = forwardRef<VideoAvatarRef, VideoAvatarProps>((props, ref) =>
     onStateChange,
     autoPlay,
   });
+
+  // 监听预加载进度
+  useEffect(() => {
+    const unsubscribe = videoPreloader.onProgress((progress) => {
+      setPreloadProgress(progress);
+    });
+    
+    // 如果核心视频已就绪，开始后台加载全部视频
+    if (videoPreloader.isCoreReady()) {
+      preloadAllVideos();
+    }
+    
+    return unsubscribe;
+  }, []);
 
   // 暴露方法给父组件
   useImperativeHandle(ref, () => ({
@@ -129,12 +153,46 @@ const VideoAvatar = forwardRef<VideoAvatarRef, VideoAvatarProps>((props, ref) =>
         }}
       />
 
-      {/* 加载指示器 */}
-      {!isInitialized && (
+      {/* 加载指示器 - 显示预加载进度 */}
+      {(!isInitialized || !preloadProgress.coreReady) && (
         <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-purple-50/80 to-pink-50/80 backdrop-blur-sm">
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-16 h-16 border-4 border-purple-200 border-t-purple-500 rounded-full animate-spin" />
-            <span className="text-purple-600 font-medium animate-pulse">加载虚拟形象...</span>
+          <div className="flex flex-col items-center gap-4 px-6 text-center">
+            {/* 加载动画 */}
+            <div className="relative w-20 h-20">
+              <div className="absolute inset-0 border-4 border-purple-200 rounded-full" />
+              <div 
+                className="absolute inset-0 border-4 border-purple-500 rounded-full border-t-transparent animate-spin"
+                style={{ animationDuration: '1s' }}
+              />
+              {/* 进度数字 */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-purple-600 font-bold text-lg">
+                  {preloadProgress.percent}%
+                </span>
+              </div>
+            </div>
+            
+            {/* 加载文案 */}
+            <div className="space-y-1">
+              <span className="text-purple-600 font-medium block">
+                {!preloadProgress.coreReady 
+                  ? '正在唤醒叉叉...' 
+                  : '准备就绪'}
+              </span>
+              <span className="text-purple-400 text-xs block">
+                {preloadProgress.currentFile 
+                  ? `加载 ${preloadProgress.currentFile.split('/').pop()}` 
+                  : `已加载 ${preloadProgress.loaded}/${preloadProgress.total} 个资源`}
+              </span>
+            </div>
+            
+            {/* 进度条 */}
+            <div className="w-48 h-2 bg-purple-100 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-purple-400 to-pink-400 transition-all duration-300"
+                style={{ width: `${preloadProgress.percent}%` }}
+              />
+            </div>
           </div>
         </div>
       )}
