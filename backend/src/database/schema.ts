@@ -182,6 +182,54 @@ CREATE TABLE IF NOT EXISTS invite_codes (
 CREATE INDEX IF NOT EXISTS idx_invite_codes_used_by ON invite_codes(used_by);
 CREATE INDEX IF NOT EXISTS idx_invite_codes_created_by ON invite_codes(created_by);
 
+-- ==================== 每日信件表 ====================
+CREATE TABLE IF NOT EXISTS daily_letters (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  date TEXT NOT NULL,           -- YYYY-MM-DD 格式
+  content TEXT NOT NULL,        -- 信件内容
+  summary TEXT,                 -- 当日对话摘要
+  mood TEXT,                    -- 心情标签 (happy, sad, neutral, excited, etc.)
+  emotion_color TEXT,           -- 情感色块 hex 颜色
+  is_read INTEGER DEFAULT 0,    -- 是否已读
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  UNIQUE(user_id, date)         -- 每用户每天只有一封信
+);
+
+-- 每日信件索引
+CREATE INDEX IF NOT EXISTS idx_daily_letters_user_id ON daily_letters(user_id);
+CREATE INDEX IF NOT EXISTS idx_daily_letters_date ON daily_letters(date);
+CREATE INDEX IF NOT EXISTS idx_daily_letters_is_read ON daily_letters(is_read);
+
+-- ==================== 用户每日状态表 ====================
+CREATE TABLE IF NOT EXISTS daily_status (
+  user_id TEXT PRIMARY KEY,
+  last_active_date TEXT,        -- 最后活跃日期 YYYY-MM-DD
+  sleep_mode INTEGER DEFAULT 0, -- 是否处于睡眠模式
+  sleep_started_at TEXT,        -- 睡眠开始时间
+  wake_up_at TEXT,              -- 预计醒来时间
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- ==================== 用户偏好画像表 ====================
+CREATE TABLE IF NOT EXISTS user_preferences (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  category TEXT NOT NULL CHECK(category IN ('nickname', 'food', 'taboo', 'anniversary', 'hobby', 'other')),
+  content TEXT NOT NULL,
+  source_memory_id TEXT,        -- 来源记忆ID
+  is_active INTEGER DEFAULT 1,  -- 是否有效
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (source_memory_id) REFERENCES memories(id) ON DELETE SET NULL
+);
+
+-- 用户偏好索引
+CREATE INDEX IF NOT EXISTS idx_user_preferences_user_id ON user_preferences(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_preferences_category ON user_preferences(category);
+
 -- ==================== 触发器：自动更新 updated_at ====================
 CREATE TRIGGER IF NOT EXISTS update_users_updated_at 
 AFTER UPDATE ON users

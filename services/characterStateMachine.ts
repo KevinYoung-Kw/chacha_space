@@ -162,46 +162,390 @@ interface VideoBuffer {
 export function createDefaultConfig(): StateMachineConfig {
   const states = new Map<VideoStateID, VideoState>();
 
-  // 待机状态 - 中间 (循环) - 使用 action_1.webm
+  // ==================== 待机状态 ====================
+  
+  // 待机状态 - 中间 (循环)
   states.set(VideoStateID.IDLE_CENTER, {
     stateID: VideoStateID.IDLE_CENTER,
-    videoSource: '/character/action_1.webm',
+    videoSource: '/character/idle_action_1.webm',
     isLoop: true,
     nextStateID: null,
     preloadStates: [VideoStateID.TRANS_CENTER_TO_LEFT, VideoStateID.TRANS_CENTER_TO_RIGHT],
   });
 
-  // 过渡：中间 → 左边 (单次) - 使用 action_2.webm
-  states.set(VideoStateID.TRANS_CENTER_TO_LEFT, {
-    stateID: VideoStateID.TRANS_CENTER_TO_LEFT,
-    videoSource: '/character/action_2.webm',
-    isLoop: false,
-    nextStateID: VideoStateID.IDLE_LEFT,
-    preloadStates: [VideoStateID.IDLE_LEFT],
-  });
-
-  // 待机状态 - 左边 (循环) - 使用 action_3.webm
+  // 待机状态 - 左边 (循环)
   states.set(VideoStateID.IDLE_LEFT, {
     stateID: VideoStateID.IDLE_LEFT,
-    videoSource: '/character/action_3.webm',
+    videoSource: '/character/idle_action_3.webm',
     isLoop: true,
     nextStateID: null,
     preloadStates: [VideoStateID.TRANS_LEFT_TO_CENTER],
   });
 
-  // 过渡：左边 → 中间 (单次) - 使用 action_4.webm
+  // 待机状态 - 右边 (循环) - 使用 idle_action_3
+  states.set(VideoStateID.IDLE_RIGHT, {
+    stateID: VideoStateID.IDLE_RIGHT,
+    videoSource: '/character/idle_action_3.webm',
+    isLoop: true,
+    nextStateID: null,
+    preloadStates: [VideoStateID.TRANS_RIGHT_TO_CENTER],
+  });
+
+  // ==================== 过渡状态 ====================
+  
+  // 过渡：中间 → 左边
+  states.set(VideoStateID.TRANS_CENTER_TO_LEFT, {
+    stateID: VideoStateID.TRANS_CENTER_TO_LEFT,
+    videoSource: '/character/idle_action_4.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_LEFT,
+    preloadStates: [VideoStateID.IDLE_LEFT],
+  });
+
+  // 过渡：左边 → 中间
   states.set(VideoStateID.TRANS_LEFT_TO_CENTER, {
     stateID: VideoStateID.TRANS_LEFT_TO_CENTER,
-    videoSource: '/character/action_4.webm',
+    videoSource: '/character/idle_action_4.webm',
     isLoop: false,
     nextStateID: VideoStateID.IDLE_CENTER,
     preloadStates: [VideoStateID.IDLE_CENTER],
   });
 
-  // 一次性动作 - 说话 - 使用 action_5.webm
+  // 过渡：中间 → 右边
+  states.set(VideoStateID.TRANS_CENTER_TO_RIGHT, {
+    stateID: VideoStateID.TRANS_CENTER_TO_RIGHT,
+    videoSource: '/character/idle_action_4.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_RIGHT,
+    preloadStates: [VideoStateID.IDLE_RIGHT],
+  });
+
+  // 过渡：右边 → 中间
+  states.set(VideoStateID.TRANS_RIGHT_TO_CENTER, {
+    stateID: VideoStateID.TRANS_RIGHT_TO_CENTER,
+    videoSource: '/character/idle_action_4.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  // ==================== 基础动作 ====================
+  
+  // 说话
   states.set(VideoStateID.ACTION_SPEAKING, {
     stateID: VideoStateID.ACTION_SPEAKING,
-    videoSource: '/character/action_5.webm',
+    videoSource: '/character/happy.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+  
+  // 挥手 - 使用 excited
+  states.set(VideoStateID.ACTION_WAVE, {
+    stateID: VideoStateID.ACTION_WAVE,
+    videoSource: '/character/excited.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+  
+  // 点头 - 使用 happy
+  states.set(VideoStateID.ACTION_NOD, {
+    stateID: VideoStateID.ACTION_NOD,
+    videoSource: '/character/happy.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+  
+  // 思考 - 使用 observing
+  states.set(VideoStateID.ACTION_THINKING, {
+    stateID: VideoStateID.ACTION_THINKING,
+    videoSource: '/character/observing.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  // ==================== 待机变体 ====================
+  
+  states.set(VideoStateID.ACTION_IDLE_ALT, {
+    stateID: VideoStateID.ACTION_IDLE_ALT,
+    videoSource: '/character/idle_alt.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_IDLE_1, {
+    stateID: VideoStateID.ACTION_IDLE_1,
+    videoSource: '/character/idle_action_1.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_IDLE_3, {
+    stateID: VideoStateID.ACTION_IDLE_3,
+    videoSource: '/character/idle_action_3.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_IDLE_4, {
+    stateID: VideoStateID.ACTION_IDLE_4,
+    videoSource: '/character/idle_action_4.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  // ==================== 情绪 - 正面 ====================
+  
+  states.set(VideoStateID.ACTION_HAPPY, {
+    stateID: VideoStateID.ACTION_HAPPY,
+    videoSource: '/character/happy.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_EXCITED, {
+    stateID: VideoStateID.ACTION_EXCITED,
+    videoSource: '/character/excited.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_JUMP, {
+    stateID: VideoStateID.ACTION_JUMP,
+    videoSource: '/character/jump.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  // ==================== 情绪 - 负面 ====================
+  
+  states.set(VideoStateID.ACTION_CRYING, {
+    stateID: VideoStateID.ACTION_CRYING,
+    videoSource: '/character/crying.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_SHY, {
+    stateID: VideoStateID.ACTION_SHY,
+    videoSource: '/character/shy.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_SCARED, {
+    stateID: VideoStateID.ACTION_SCARED,
+    videoSource: '/character/scared.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_ANGRY_CROSS, {
+    stateID: VideoStateID.ACTION_ANGRY_CROSS,
+    videoSource: '/character/angry_arms_crossed.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_RAGE, {
+    stateID: VideoStateID.ACTION_RAGE,
+    videoSource: '/character/rage.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_DISAPPROVE, {
+    stateID: VideoStateID.ACTION_DISAPPROVE,
+    videoSource: '/character/disapprove.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_SHOUTING, {
+    stateID: VideoStateID.ACTION_SHOUTING,
+    videoSource: '/character/shouting.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  // ==================== 活动状态 ====================
+  
+  states.set(VideoStateID.ACTION_SLEEPING, {
+    stateID: VideoStateID.ACTION_SLEEPING,
+    videoSource: '/character/sleeping.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_SLEEPING_LONG, {
+    stateID: VideoStateID.ACTION_SLEEPING_LONG,
+    videoSource: '/character/sleeping_long.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_LISTENING_V2, {
+    stateID: VideoStateID.ACTION_LISTENING_V2,
+    videoSource: '/character/listening_v2.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_LISTENING_MUSIC, {
+    stateID: VideoStateID.ACTION_LISTENING_MUSIC,
+    videoSource: '/character/listening_music.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_SINGING, {
+    stateID: VideoStateID.ACTION_SINGING,
+    videoSource: '/character/singing.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_PHONE, {
+    stateID: VideoStateID.ACTION_PHONE,
+    videoSource: '/character/using_phone.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_CHECK_PHONE, {
+    stateID: VideoStateID.ACTION_CHECK_PHONE,
+    videoSource: '/character/checking_phone.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_NOTES, {
+    stateID: VideoStateID.ACTION_NOTES,
+    videoSource: '/character/taking_notes.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  // ==================== 天气相关 ====================
+  
+  states.set(VideoStateID.ACTION_WEATHER, {
+    stateID: VideoStateID.ACTION_WEATHER,
+    videoSource: '/character/weather.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  // ==================== 技能相关 ====================
+  
+  states.set(VideoStateID.ACTION_SKILL, {
+    stateID: VideoStateID.ACTION_SKILL,
+    videoSource: '/character/skill.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  // ==================== 风相关 ====================
+  
+  states.set(VideoStateID.ACTION_WIND_BLOWING, {
+    stateID: VideoStateID.ACTION_WIND_BLOWING,
+    videoSource: '/character/wind_blowing.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_STRONG_WIND, {
+    stateID: VideoStateID.ACTION_STRONG_WIND,
+    videoSource: '/character/strong_wind.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_WIND_BLOWING_2, {
+    stateID: VideoStateID.ACTION_WIND_BLOWING_2,
+    videoSource: '/character/wind_blowing_2.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  // ==================== 跳舞相关 ====================
+  
+  states.set(VideoStateID.ACTION_DANCING, {
+    stateID: VideoStateID.ACTION_DANCING,
+    videoSource: '/character/dancing.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_DANCING_2, {
+    stateID: VideoStateID.ACTION_DANCING_2,
+    videoSource: '/character/dancing_2.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  // ==================== 塔罗相关 ====================
+  
+  states.set(VideoStateID.ACTION_TAROT_READING, {
+    stateID: VideoStateID.ACTION_TAROT_READING,
+    videoSource: '/character/tarot_reading.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  // ==================== 其他动作 ====================
+  
+  states.set(VideoStateID.ACTION_SURPRISED_OBSERVE, {
+    stateID: VideoStateID.ACTION_SURPRISED_OBSERVE,
+    videoSource: '/character/surprised_observe.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_DRINKING_WATER, {
+    stateID: VideoStateID.ACTION_DRINKING_WATER,
+    videoSource: '/character/drinking_water.webm',
+    isLoop: false,
+    nextStateID: VideoStateID.IDLE_CENTER,
+    preloadStates: [VideoStateID.IDLE_CENTER],
+  });
+
+  states.set(VideoStateID.ACTION_OBSERVING, {
+    stateID: VideoStateID.ACTION_OBSERVING,
+    videoSource: '/character/observing.webm',
     isLoop: false,
     nextStateID: VideoStateID.IDLE_CENTER,
     preloadStates: [VideoStateID.IDLE_CENTER],
@@ -211,6 +555,11 @@ export function createDefaultConfig(): StateMachineConfig {
     states,
     initialState: VideoStateID.IDLE_CENTER,
     defaultIdleState: VideoStateID.IDLE_CENTER,
+    idleTimeout: {
+      randomIdleDelay: 30000,  // 30秒后随机待机
+      sleepDelay: 120000,      // 2分钟后睡觉
+      randomIdleActions: ['idle_alt', 'idle_3', 'idle_4', 'listening_v2', 'observing'],
+    },
   };
 }
 
@@ -906,6 +1255,7 @@ export class VirtualCharacterStateMachine {
    * @param timeout 超时时间（毫秒），超时后自动回退到待机状态
    */
   public playAction(actionName: string, timeout: number = 8000): void {
+    console.log(`[StateMachine] 播放动画: ${actionName}`);
     
     // 重置活动计时器（除了自动播放的随机待机动画）
     if (!this.isInIdleMode) {
@@ -989,14 +1339,16 @@ export class VirtualCharacterStateMachine {
       return;
     }
     
-    // 检查目标动画是否已缓存，如果未缓存则选择替代动画
+    // 如果视频未缓存，先尝试按需加载
     if (!videoPreloader.isVideoLoaded(actionState.videoSource)) {
-      const fallbackAction = this.findCachedAlternative(actionName, actionMap);
-      if (fallbackAction && fallbackAction !== actionStateID) {
-        console.log(`[StateMachine] 动画 ${actionName} 未缓存，使用替代: ${fallbackAction}`);
-        actionStateID = fallbackAction;
-        actionState = this.config.states.get(actionStateID)!;
-      }
+      console.log(`[StateMachine] 动画 ${actionName} 未缓存，尝试按需加载: ${actionState.videoSource}`);
+      // 异步加载视频，同时使用原始URL播放（不等待加载完成）
+      loadVideoOnDemand(actionState.videoSource).then(() => {
+        console.log(`[StateMachine] 动画 ${actionName} 按需加载完成`);
+      }).catch((err) => {
+        console.warn(`[StateMachine] 动画 ${actionName} 按需加载失败:`, err);
+      });
+      // 不再使用替代动画，直接使用原始视频URL播放
     }
 
     // 修改动作状态的 nextStateID 为当前待机状态

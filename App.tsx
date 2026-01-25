@@ -22,7 +22,12 @@ import { api, authApi, chatApi, categoryApi, healthApi, todoApi, weatherApi, tts
 import { decodeAudioData, playAudioBuffer } from './services/audioService';
 import { loadAffinityData, updateAffinity, getAffinityLevel, saveAffinityData } from './services/affinityService';
 // 记忆功能已由后端AI自动处理，前端不再主动生成记忆
-import { CloudSun, Sparkles, Mic2, Activity, CheckSquare, Zap, ChevronUp, ChevronDown, LogOut, Film, Brain, Music, VolumeX } from 'lucide-react';
+import { CloudSun, Sparkles, Mic2, Activity, CheckSquare, Zap, ChevronUp, ChevronDown, LogOut, Film, Brain, Music, VolumeX, Package } from 'lucide-react';
+import PocketMenu, { PocketPanelType } from './components/PocketMenu';
+import DailyLetter from './components/DailyLetter';
+import GoodNightModal, { SleepModeOverlay } from './components/GoodNightModal';
+import useTimeOfDay from './hooks/useTimeOfDay';
+import { dailyApi, DailyLetter as DailyLetterType } from './services/api';
 
 // Panel Types - 统一管理，所有面板都在右侧显示
 type ActivePanelType = 'none' | 'bgm' | 'weather' | 'fortune' | 'health' | 'todo' | 'skills' | 'memory' | 'watcha' | 'animation' | 'affinity';
@@ -45,6 +50,9 @@ const App: React.FC = () => {
   
   // Panel States - 统一管理
   const [activePanel, setActivePanel] = useState<ActivePanelType>('none');
+  
+  // 时间感知 - 根据时段切换背景色调
+  const timeOfDay = useTimeOfDay();
   
   // Voice State - 固定使用 Korean_ThoughtfulWoman
   const currentVoiceId = 'Korean_ThoughtfulWoman';
@@ -90,6 +98,15 @@ const App: React.FC = () => {
   
   // Micro-interaction State
   const [hasNewTodo, setHasNewTodo] = useState(false);
+  const [isMemoryRecording, setIsMemoryRecording] = useState(false);
+  
+  // 每日信件状态
+  const [pendingLetter, setPendingLetter] = useState<DailyLetterType | null>(null);
+  const [showDailyLetter, setShowDailyLetter] = useState(false);
+  
+  // 睡眠模式状态
+  const [isSleepMode, setIsSleepMode] = useState(false);
+  const [showGoodNightModal, setShowGoodNightModal] = useState(false);
   
   // 响应式屏幕大小检测
   const [isSmallScreen, setIsSmallScreen] = useState(false);
@@ -98,7 +115,6 @@ const App: React.FC = () => {
 
   const [state, setState] = useState<AssistantState>(AssistantState.IDLE);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [latestResponse, setLatestResponse] = useState<string | null>(null);
   
   // Data States
   const [categories, setCategories] = useState<TodoCategory[]>([]);
@@ -398,6 +414,17 @@ const App: React.FC = () => {
         exercise: healthResult.data.exercise
       });
     }
+
+    // 检查是否有待读的每日信件（拆信仪式）
+    try {
+      const letterResult = await dailyApi.getLetter();
+      if (letterResult.success && letterResult.data) {
+        setPendingLetter(letterResult.data);
+        setShowDailyLetter(true);
+      }
+    } catch (err) {
+      console.log('[Daily] No pending letter');
+    }
   };
 
   // --- Helpers ---
@@ -408,9 +435,6 @@ const App: React.FC = () => {
       content,
       timestamp: Date.now()
     }]);
-    if (role === 'assistant') {
-        setLatestResponse(content);
-    }
   };
 
   // 停止当前播放的音频
@@ -528,6 +552,11 @@ const App: React.FC = () => {
                 functionCallAnimation = 'drinking_water';
               }
               break;
+            case 'memoryRecorded':
+              // 记忆已记录 -> 触发记忆闪烁动画
+              setIsMemoryRecording(true);
+              setTimeout(() => setIsMemoryRecording(false), 3000);
+              break;
             default:
               break;
           }
@@ -549,35 +578,33 @@ const App: React.FC = () => {
         }
 
         addMessage('assistant', content);
-        setState(AssistantState.SPEAKING);
         
         // 根据是否有 Function Call 决定动画
         if (hasFunctionCall && functionCallAnimation) {
-          // Function Call 场景：直接播放对应动画，不调用情绪检测 API
-          console.log(`[Animation] Function Call 触发，直接播放: ${functionCallAnimation}`);
+          // Function Call 场景：直接播放对应动画（占卜、天气、喝水等）
           videoAvatarRef.current?.playAction(functionCallAnimation);
         } else {
-          // 非 Function Call 场景：调用情绪检测 API 选择动画
+          // 非 Function Call 场景：调用情绪检测 API，由 LLM 决定播放什么动画
           try {
-            const emotionResult = await emotionApi.detect(text);
+            const emotionResult = await emotionApi.detect(content);
             if (emotionResult.success && emotionResult.data) {
               const { action: emotionAction } = emotionResult.data;
-              // 如果是正面或负面情绪，播放对应动画；否则播放说话动画
+              // 播放 LLM 推荐的情绪动画
               if (emotionAction && emotionAction !== 'listening_v2' && emotionAction !== 'nod') {
                 videoAvatarRef.current?.playAction(emotionAction);
               } else {
                 videoAvatarRef.current?.playAction('speaking');
               }
             } else {
-              // 默认播放说话动画
               videoAvatarRef.current?.playAction('speaking');
             }
           } catch (emotionError) {
-            console.warn('[Emotion] 情绪检测失败，使用默认动画:', emotionError);
+            console.warn('[Animation] 情绪检测失败:', emotionError);
             videoAvatarRef.current?.playAction('speaking');
           }
         }
         
+        setState(AssistantState.SPEAKING);
         await speak(content);
       } else {
         const errorMsg = chatResult.error || '抱歉，时间线出了点小波动~';
@@ -615,6 +642,76 @@ const App: React.FC = () => {
     setTodos([]);
     setShowAuthModal(true);
   };
+
+  // 关闭每日信件
+  const handleCloseLetter = async () => {
+    if (pendingLetter) {
+      try {
+        await dailyApi.markLetterRead(pendingLetter.id);
+      } catch (err) {
+        console.error('[Daily] Failed to mark letter as read:', err);
+      }
+    }
+    setShowDailyLetter(false);
+    setPendingLetter(null);
+  };
+
+  // 晚安 - 进入睡眠模式
+  const handleGoodNight = async () => {
+    try {
+      await dailyApi.sleep();
+      setShowGoodNightModal(false);
+      setIsSleepMode(true);
+      videoAvatarRef.current?.playAction('sleeping');
+    } catch (err) {
+      console.error('[Daily] Failed to enter sleep mode:', err);
+    }
+  };
+
+  // 唤醒 - 退出睡眠模式
+  const handleWakeUp = async () => {
+    try {
+      await dailyApi.wake();
+      setIsSleepMode(false);
+      videoAvatarRef.current?.playAction('happy');
+    } catch (err) {
+      console.error('[Daily] Failed to wake up:', err);
+    }
+  };
+
+  // 检查睡眠状态（用户登录后）
+  useEffect(() => {
+    if (!user) return;
+
+    const checkSleepStatus = async () => {
+      try {
+        const result = await dailyApi.getStatus();
+        if (result.success && result.data?.sleepMode) {
+          setIsSleepMode(true);
+        }
+      } catch (err) {
+        console.log('[Daily] Failed to check sleep status');
+      }
+    };
+
+    checkSleepStatus();
+  }, [user]);
+
+  // 凌晨 4:00 自动进入睡眠模式
+  useEffect(() => {
+    if (!user || isSleepMode) return;
+
+    const checkAutoSleep = () => {
+      const hour = new Date().getHours();
+      if (hour === 4) {
+        setShowGoodNightModal(true);
+      }
+    };
+
+    // 每分钟检查一次
+    const interval = setInterval(checkAutoSleep, 60000);
+    return () => clearInterval(interval);
+  }, [user, isSleepMode]);
 
   // --- 获取天气 ---
   useEffect(() => {
@@ -1036,6 +1133,9 @@ const App: React.FC = () => {
             backgroundRepeat: 'no-repeat'
           }}
         ></div>
+        {/* 时间感知背景叠加层 */}
+        <div className="absolute inset-0 time-tint-overlay" />
+        <div className="absolute inset-0 time-gradient-overlay" />
         {/* Subtle overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-[#fdfcf8]/30 pointer-events-none"></div>
 
@@ -1046,19 +1146,14 @@ const App: React.FC = () => {
           </h1>
         </div>
 
-        {/* 用户信息和登出按钮 */}
-        <div className="absolute top-4 right-4 z-50 flex items-center gap-3">
-          <span className="text-sm text-[#8b7b6d]">
-            你好，{user.name}
-          </span>
-          <button
-            onClick={handleLogout}
-            className="flex items-center justify-center p-2 rounded-full bg-white/60 hover:bg-white/80 transition-all"
-            title="登出"
-          >
-            <LogOut size={18} className="text-[#8b7b6d]" />
-          </button>
-        </div>
+        {/* 用户名称 - 桌面端显示在右上角 */}
+        {!isMobile && (
+          <div className="absolute top-4 right-4 z-50">
+            <span className="text-sm text-[#8b7b6d]">
+              你好，{user.name}
+            </span>
+          </div>
+        )}
 
         {/* 版本号 - 仅桌面端显示 */}
         {!isMobile && (
@@ -1084,6 +1179,8 @@ const App: React.FC = () => {
               isMobile={false}
               isBgmPlaying={isBgmPlaying}
               onToggleBgm={toggleBgm}
+              isMemoryRecording={isMemoryRecording}
+              onLogout={handleLogout}
             />
           </div>
 
@@ -1092,29 +1189,6 @@ const App: React.FC = () => {
             relative z-10 flex-1 min-w-0
             transition-all duration-500 ease-in-out
           `}>
-            {/* Speech Bubble - 绝对定位在叉叉上方 */}
-            <div className={`
-              absolute left-0 right-0 w-full flex items-end justify-center mb-2 px-3 sm:px-4 pointer-events-none mx-auto z-20
-              ${isMobile 
-                ? 'top-4 max-w-[85%] h-16' 
-                : 'top-20 max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl h-20 md:h-28'}
-            `}>
-                {state === AssistantState.SPEAKING && latestResponse && (
-                <div className={`
-                  bg-white/90 backdrop-blur-md border border-purple-100 shadow-xl font-medium text-gray-700 animate-fade-in-up relative max-w-full text-center
-                  ${isMobile 
-                    ? 'px-3 py-2 rounded-xl rounded-bl-none text-xs' 
-                    : 'px-4 md:px-6 py-3 md:py-4 rounded-2xl md:rounded-3xl rounded-bl-none text-xs sm:text-sm md:text-base'}
-                `}>
-                        {latestResponse}
-                  <div className={`
-                    absolute bg-white/90 border-b border-r border-purple-100 transform rotate-45
-                    ${isMobile ? '-bottom-1.5 left-3 w-2.5 h-2.5' : '-bottom-2 left-4 md:left-6 w-3 md:w-4 h-3 md:h-4'}
-                  `}></div>
-                    </div>
-                )}
-             </div>
-
             {/* Character - 绝对定位居中 */}
             <div 
               className={`
@@ -1182,6 +1256,8 @@ const App: React.FC = () => {
                 onStartListening={startListening}
                 onStopListening={stopListening}
                 inputRef={inputRef}
+                onGoodNight={() => setShowGoodNightModal(true)}
+                isSleepMode={isSleepMode}
               />
             </div>
             </div>
@@ -1219,6 +1295,10 @@ const App: React.FC = () => {
                 videoAvatarRef={videoAvatarRef}
                 affinity={affinity}
                 setAffinity={setAffinity}
+                isBgmPlaying={isBgmPlaying}
+                onToggleBgm={toggleBgm}
+                onLogout={handleLogout}
+                userName={user.name}
               />
             </div>
           )}
@@ -1245,6 +1325,27 @@ const App: React.FC = () => {
           )}
         </div>
 
+        {/* 每日信件 - 拆信仪式 */}
+        {showDailyLetter && pendingLetter && (
+          <DailyLetter 
+            letter={pendingLetter}
+            onClose={handleCloseLetter}
+          />
+        )}
+
+        {/* 晚安确认弹窗 */}
+        <GoodNightModal
+          isVisible={showGoodNightModal}
+          onConfirm={handleGoodNight}
+          onCancel={() => setShowGoodNightModal(false)}
+        />
+
+        {/* 睡眠模式遮罩 */}
+        <SleepModeOverlay
+          isActive={isSleepMode}
+          onWake={handleWakeUp}
+        />
+
      </div>
     );
   };
@@ -1260,6 +1361,9 @@ interface ToolbarProps {
   isMobile?: boolean;
   isBgmPlaying?: boolean;
   onToggleBgm?: () => void;
+  isMemoryRecording?: boolean;
+  onLogout?: () => void;
+  userName?: string;
 }
 
 // 手机端底部工具栏
@@ -1269,132 +1373,187 @@ const MobileToolbar: React.FC<ToolbarProps> = ({
   hasNewTodo,
   videoAvatarRef,
   affinity,
-  setAffinity
+  setAffinity,
+  isBgmPlaying = false,
+  onToggleBgm,
+  onLogout,
+  userName
 }) => {
   // 获取当前好感度等级数字（v1 = 1, v2 = 2, ...）
   const affinityLevelNum = parseInt(affinity.level.replace('v', '')) || 1;
   
-  // 滑动提示状态
-  const [showRightScroll, setShowRightScroll] = React.useState(false);
-  const toolbarRef = React.useRef<HTMLDivElement>(null);
-
-  // 检测是否可以滚动
-  const checkScroll = React.useCallback(() => {
-    const toolbar = toolbarRef.current;
-    if (!toolbar) return;
-
-    const { scrollLeft, scrollWidth, clientWidth } = toolbar;
-    const canScrollRight = scrollLeft + clientWidth < scrollWidth - 5;
-    setShowRightScroll(canScrollRight);
-  }, []);
-
-  // 初始检测和滚动监听
-  React.useEffect(() => {
-    const toolbar = toolbarRef.current;
-    if (!toolbar) return;
-
-    checkScroll();
-    toolbar.addEventListener('scroll', checkScroll);
-    window.addEventListener('resize', checkScroll);
-    
-    return () => {
-      toolbar.removeEventListener('scroll', checkScroll);
-      window.removeEventListener('resize', checkScroll);
-    };
-  }, [checkScroll]);
-
-  const scrollRight = () => {
-    toolbarRef.current?.scrollBy({ left: 200, behavior: 'smooth' });
+  // 百宝箱展开状态
+  const [isPocketOpen, setIsPocketOpen] = React.useState(false);
+  
+  // 动画状态
+  const [isAnimating, setIsAnimating] = React.useState(false);
+  
+  // 切换百宝箱时添加动画
+  const togglePocket = (open: boolean) => {
+    setIsAnimating(true);
+    setIsPocketOpen(open);
+    setTimeout(() => setIsAnimating(false), 200);
   };
 
   const togglePanel = (panel: ActivePanelType) => {
     const newState = activePanel === panel ? 'none' : panel;
     setActivePanel(newState);
     
-    // 隐藏测试功能：打开 Watcha 面板时提升 5 级好感度（通过 API 同步到数据库）
-    if (panel === 'watcha' && newState === 'watcha') {
-      updateAffinity('test_boost').then(({ data }) => {
-        setAffinity(data);
-        videoAvatarRef.current?.playAction('excited');
-        console.log(`[测试] Watcha 按钮：好感度提升到 ${data.value} (${data.level})`);
-      }).catch(err => {
-        console.error('[测试] 好感度提升失败:', err);
-      });
-    }
-    
     if (panel === 'todo' && newState === 'todo') {
       videoAvatarRef.current?.playAction('wave');
     }
   };
 
-  // 手机端显示的核心工具（可左右滑动）
-  const tools = [
-    { id: 'health' as const, icon: <Activity size={20} />, label: '健康' },
-    { id: 'todo' as const, icon: <CheckSquare size={20} />, label: '待办', notification: hasNewTodo },
-    { id: 'fortune' as const, icon: <Sparkles size={20} />, label: '占卜' },
-    { id: 'weather' as const, icon: <CloudSun size={20} />, label: '天气' },
+  // 处理百宝箱面板选择
+  const handlePocketSelect = (panel: PocketPanelType | 'none') => {
+    if (panel === 'none') {
+      setActivePanel('none');
+    } else {
+      setActivePanel(panel as ActivePanelType);
+    }
+    setIsPocketOpen(false);
+  };
+
+  // 主要入口：记忆、好感度、百宝箱
+  const primaryTools = [
     { id: 'memory' as const, icon: <Brain size={20} />, label: '记忆' },
-    { id: 'skills' as const, icon: <Zap size={20} />, label: '技能' },
-    { id: 'animation' as const, icon: <Film size={20} />, label: '动作' },
     { id: 'affinity' as const, icon: <AffinityIndicator variant="toolbar" affinity={affinity} />, label: '好感度' },
   ];
 
+  // 百宝箱内是否有激活面板
+  const pocketPanels: PocketPanelType[] = ['bgm', 'health', 'weather', 'fortune', 'todo', 'skills', 'animation'];
+  const isPocketPanelActive = pocketPanels.includes(activePanel as PocketPanelType);
+
+  // 百宝箱内的工具列表
+  const pocketTools = [
+    { id: 'bgm' as const, icon: isBgmPlaying ? <Music size={18} /> : <VolumeX size={18} />, label: '音乐' },
+    { id: 'health' as const, icon: <Activity size={18} />, label: '健康' },
+    { id: 'weather' as const, icon: <CloudSun size={18} />, label: '天气' },
+    { id: 'fortune' as const, icon: <Sparkles size={18} />, label: '占卜' },
+    { id: 'todo' as const, icon: <CheckSquare size={18} />, label: '待办', notification: hasNewTodo },
+    { id: 'skills' as const, icon: <Zap size={18} />, label: '技能' },
+    { id: 'animation' as const, icon: <Film size={18} />, label: '动作', requiredLevel: 3 },
+  ];
+
+  const handlePocketToolClick = (toolId: PocketPanelType) => {
+    if (toolId === 'bgm') {
+      onToggleBgm?.();
+    } else {
+      const newPanel = activePanel === toolId ? 'none' : toolId;
+      setActivePanel(newPanel as ActivePanelType);
+      // 不收起百宝箱，让用户可以继续切换工具
+    }
+  };
+
   return (
     <div className="glass-panel border-t relative" style={{ borderColor: 'var(--color-border-light)' }}>
-      {/* 右侧滚动按钮（参考电脑端设计） */}
       <div 
-        className={`absolute right-2 top-1/2 -translate-y-1/2 z-10 transition-all duration-300 ${
-          showRightScroll ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
+        className={`mobile-toolbar safe-area-pb justify-center gap-3 transition-all duration-200 ${isAnimating ? 'opacity-80' : ''}`}
+        style={{ minHeight: '60px' }}
       >
-        <button
-          onClick={scrollRight}
-          className="flex items-center justify-center p-2 rounded-full bg-white/80 backdrop-blur-sm shadow-md hover:bg-white hover:shadow-lg transition-all duration-200 group"
-          aria-label="查看更多工具"
-        >
-          <svg 
-            className="w-4 h-4 text-[#8b7b6d] group-hover:text-[#5c4d43] transition-colors" 
-            fill="none" 
-            stroke="currentColor" 
-            viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
-      </div>
-      
-      {/* 右侧渐变遮罩（提示有更多内容） */}
-      <div 
-        className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-[var(--color-bg-base)] via-[var(--color-bg-base)]/60 to-transparent pointer-events-none z-[5]" 
-        style={{ opacity: showRightScroll ? 1 : 0, transition: 'opacity 0.3s' }} 
-      />
-      
-      <div ref={toolbarRef} className="mobile-toolbar safe-area-pb">
-        {tools.map((tool) => (
-          <button
-            key={tool.id}
-            onClick={() => togglePanel(tool.id)}
-            className={`mobile-toolbar-item ${activePanel === tool.id ? 'active' : ''}`}
-          >
-            <span className="relative">
-              {tool.icon}
-              {tool.notification && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full border border-white" 
-                      style={{ background: 'var(--color-accent-rose)' }} />
-              )}
-            </span>
-            <span className="text-[10px] mt-1 font-medium" 
-                  style={{ color: activePanel === tool.id ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
-              {tool.label}
-            </span>
-          </button>
-        ))}
+        {isPocketOpen ? (
+          // 百宝箱模式：显示返回按钮 + 工具列表
+          <>
+            {/* 返回按钮 - 固定左侧 */}
+            <button
+              onClick={() => togglePocket(false)}
+              className="mobile-toolbar-item flex-shrink-0 min-w-[48px]"
+            >
+              <ChevronDown size={18} className="text-gray-500" />
+              <span className="text-[10px] mt-0.5 font-medium text-gray-500">返回</span>
+            </button>
+
+            {/* 分隔线 */}
+            <div className="w-px h-8 bg-gray-200/60 flex-shrink-0" />
+
+            {/* 工具列表 - 可横向滚动 */}
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar flex-1">
+              {pocketTools.map((tool) => {
+                const isLocked = tool.requiredLevel ? affinityLevelNum < tool.requiredLevel : false;
+                const isActive = tool.id === 'bgm' ? isBgmPlaying : activePanel === tool.id;
+
+                return (
+                  <button
+                    key={tool.id}
+                    onClick={() => !isLocked && handlePocketToolClick(tool.id)}
+                    disabled={isLocked}
+                    className={`mobile-toolbar-item flex-shrink-0 min-w-[48px] ${isActive ? 'active' : ''} ${isLocked ? 'opacity-40' : ''}`}
+                  >
+                    <span className="relative">
+                      {tool.icon}
+                      {tool.notification && (
+                        <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full border border-white bg-rose-500" />
+                      )}
+                    </span>
+                    <span className="text-[10px] mt-0.5 font-medium" 
+                          style={{ color: isActive ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                      {tool.label}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+          </>
+        ) : (
+          // 主界面模式：显示主要入口 + 百宝箱按钮 + 退出
+          <>
+            {/* 主要入口 */}
+            {primaryTools.map((tool) => (
+              <button
+                key={tool.id}
+                onClick={() => togglePanel(tool.id)}
+                className={`mobile-toolbar-item min-w-[52px] ${activePanel === tool.id ? 'active' : ''}`}
+              >
+                <span className="relative">
+                  {tool.icon}
+                </span>
+                <span className="text-[10px] mt-0.5 font-medium" 
+                      style={{ color: activePanel === tool.id ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                  {tool.label}
+                </span>
+              </button>
+            ))}
+
+            {/* 分隔线 */}
+            <div className="w-px h-8 bg-gray-200/60" />
+
+            {/* 百宝箱按钮 */}
+            <button
+              onClick={() => togglePocket(true)}
+              className={`mobile-toolbar-item min-w-[52px] ${isPocketPanelActive ? 'active' : ''}`}
+            >
+              <span className="relative">
+                <Package size={20} />
+                {hasNewTodo && (
+                  <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full border border-white bg-rose-500" />
+                )}
+              </span>
+              <span className="text-[10px] mt-0.5 font-medium" 
+                    style={{ color: isPocketPanelActive ? 'var(--color-text-primary)' : 'var(--color-text-muted)' }}>
+                百宝箱
+              </span>
+            </button>
+
+            {/* 分隔线 */}
+            <div className="w-px h-8 bg-gray-200/60" />
+
+            {/* 退出按钮 */}
+            <button
+              onClick={onLogout}
+              className="mobile-toolbar-item min-w-[48px]"
+            >
+              <LogOut size={18} className="text-gray-400" />
+              <span className="text-[10px] mt-0.5 font-medium text-gray-400">退出</span>
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
 };
 
-// Scrollable Toolbar Component (桌面端)
+// Scrollable Toolbar Component (桌面端) - 分级结构
 const ScrollableToolbar: React.FC<ToolbarProps> = ({ 
   activePanel, 
   setActivePanel, 
@@ -1404,196 +1563,168 @@ const ScrollableToolbar: React.FC<ToolbarProps> = ({
   setAffinity,
   isMobile = false,
   isBgmPlaying = false,
-  onToggleBgm
+  onToggleBgm,
+  isMemoryRecording = false,
+  onLogout
 }) => {
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const toolRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const [showTopFade, setShowTopFade] = useState(false);
-  const [showBottomFade, setShowBottomFade] = useState(false);
-
-  const checkScroll = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    
-    const { scrollTop, scrollHeight, clientHeight } = container;
-    setShowTopFade(scrollTop > 5);
-    setShowBottomFade(scrollTop + clientHeight < scrollHeight - 5);
-  }, []);
-
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    
-    checkScroll();
-    container.addEventListener('scroll', checkScroll);
-    return () => container.removeEventListener('scroll', checkScroll);
-  }, [checkScroll]);
-
-  useEffect(() => {
-    if (activePanel === 'none') return;
-    
-    const container = scrollContainerRef.current;
-    const toolElement = toolRefs.current.get(activePanel);
-    
-    if (container && toolElement) {
-      const containerRect = container.getBoundingClientRect();
-      const toolRect = toolElement.getBoundingClientRect();
-      
-      const isAbove = toolRect.top < containerRect.top;
-      const isBelow = toolRect.bottom > containerRect.bottom;
-      
-      if (isAbove || isBelow) {
-        const scrollTarget = toolElement.offsetTop - container.clientHeight / 2 + toolElement.clientHeight / 2;
-        container.scrollTo({ top: scrollTarget, behavior: 'smooth' });
-      }
-    }
-  }, [activePanel]);
-
-  const scrollUp = () => {
-    scrollContainerRef.current?.scrollBy({ top: -100, behavior: 'smooth' });
-  };
-
-  const scrollDown = () => {
-    scrollContainerRef.current?.scrollBy({ top: 100, behavior: 'smooth' });
-  };
+  // 百宝箱展开状态
+  const [isPocketOpen, setIsPocketOpen] = useState(false);
+  
+  // 获取当前好感度等级数字（v1 = 1, v2 = 2, ...）
+  const affinityLevelNum = parseInt(affinity.level.replace('v', '')) || 1;
 
   const togglePanel = (panel: ActivePanelType) => {
-    // BGM 按钮特殊处理 - 不触发面板，只切换音乐
-      if (panel === 'bgm') {
-      if (onToggleBgm) {
-        onToggleBgm();
-      }
-      return;
-    }
-    
     const newState = activePanel === panel ? 'none' : panel;
     setActivePanel(newState);
-    
-    // 隐藏测试功能：打开 Watcha 面板时提升 5 级好感度（通过 API 同步到数据库）
-    if (panel === 'watcha' && newState === 'watcha') {
-      updateAffinity('test_boost').then(({ data }) => {
-        setAffinity(data);
-        videoAvatarRef.current?.playAction('excited');
-        console.log(`[测试] Watcha 按钮：好感度提升到 ${data.value} (${data.level})`);
-      }).catch(err => {
-        console.error('[测试] 好感度提升失败:', err);
-      });
-    }
     
     if (panel === 'todo' && newState === 'todo') {
       videoAvatarRef.current?.playAction('wave');
     }
   };
 
-  // 获取当前好感度等级数字（v1 = 1, v2 = 2, ...）
-  const affinityLevelNum = parseInt(affinity.level.replace('v', '')) || 1;
-
-  const tools = [
-    // BGM 按钮 - 放在最前面
-    { 
-      id: 'bgm' as const, 
-      icon: isBgmPlaying ? <Music size={22} /> : <VolumeX size={22} />, 
-      label: '音乐',
-      isBgmButton: true
-    },
-    { id: 'health' as const, icon: <Activity size={22} />, label: '健康' },
-    { id: 'weather' as const, icon: <CloudSun size={22} />, label: '天气' },
-    { id: 'fortune' as const, icon: <Sparkles size={22} />, label: '占卜' },
-    { id: 'todo' as const, icon: <CheckSquare size={22} />, label: '待办', notification: hasNewTodo },
-    { id: 'skills' as const, icon: <Zap size={22} />, label: '技能' },
-    { 
-      id: 'memory' as const, 
-      icon: <Brain size={22} />, 
-      label: '记忆',
-      requiredLevel: 2,
-      lockedMessage: '需要好感度满 2 级'
-    },
-    { id: 'affinity' as const, icon: <AffinityIndicator variant="toolbar" affinity={affinity} />, label: '好感度' },
-    { id: 'watcha' as const, icon: <img src="/watcha.svg" alt="Watcha" className="w-5 h-5 pointer-events-none" style={{ filter: activePanel === 'watcha' ? 'none' : 'opacity(0.6)' }} />, label: 'Watcha' },
-    { 
-      id: 'animation' as const, 
-      icon: <Film size={22} />, 
-      label: '动作',
-      requiredLevel: 3,
-      lockedMessage: '需要好感度满 3 级'
-    },
+  // 百宝箱内的工具列表
+  const pocketTools = [
+    { id: 'bgm' as const, icon: isBgmPlaying ? <Music size={20} /> : <VolumeX size={20} />, label: '音乐' },
+    { id: 'health' as const, icon: <Activity size={20} />, label: '健康' },
+    { id: 'weather' as const, icon: <CloudSun size={20} />, label: '天气' },
+    { id: 'fortune' as const, icon: <Sparkles size={20} />, label: '占卜' },
+    { id: 'todo' as const, icon: <CheckSquare size={20} />, label: '待办', notification: hasNewTodo },
+    { id: 'skills' as const, icon: <Zap size={20} />, label: '技能' },
+    { id: 'animation' as const, icon: <Film size={20} />, label: '动作', requiredLevel: 3 },
   ];
 
-  return (
-    <div className="relative flex flex-col items-center h-full max-h-[85vh] overflow-visible">
-      {/* Top Scroll Button */}
-      <div 
-        className={`flex-shrink-0 mb-1 sm:mb-2 transition-all duration-300 ${
-          showTopFade ? 'opacity-100' : 'opacity-0 pointer-events-none h-0 mb-0'
-        }`}
-      >
-        <button
-          onClick={scrollUp}
-          className="p-1.5 sm:p-2 rounded-full bg-white/80 backdrop-blur-sm shadow-md hover:bg-white hover:shadow-lg transition-all duration-200 group"
-          aria-label="向上滚动"
-        >
-          <ChevronUp size={14} className="sm:w-4 sm:h-4 text-[#8b7b6d] group-hover:text-[#5c4d43] transition-colors" />
-        </button>
-      </div>
+  const handlePocketToolClick = (toolId: PocketPanelType) => {
+    if (toolId === 'bgm') {
+      onToggleBgm?.();
+    } else {
+      const newPanel = activePanel === toolId ? 'none' : toolId;
+      setActivePanel(newPanel as ActivePanelType);
+      // 不收起百宝箱，让用户可以继续切换工具
+    }
+  };
 
-      {/* Scrollable Tools Container */}
-      <div 
-        ref={scrollContainerRef}
-        className="flex flex-col gap-1 sm:gap-2 flex-1 overflow-y-auto overflow-x-visible no-scrollbar py-1"
-      >
-        {tools.map((tool) => {
-          const isLocked = tool.requiredLevel ? affinityLevelNum < tool.requiredLevel : false;
-          const isBgmTool = (tool as any).isBgmButton;
-          // BGM 按钮不参与面板激活状态，只显示播放状态
-          const isActive = isBgmTool ? isBgmPlaying : activePanel === tool.id;
-          
-          return (
-            <div 
-              key={tool.id} 
-              ref={(el) => { if (el) toolRefs.current.set(tool.id, el); }}
-              className="overflow-visible"
-            >
-              <ToolbarIcon
-                icon={tool.icon}
-                active={isActive}
-                onClick={() => togglePanel(tool.id)}
-                label={tool.label}
-                notification={tool.notification}
-                locked={isLocked}
-                lockedMessage={tool.lockedMessage}
-              />
+  // 检查百宝箱内是否有激活面板
+  const pocketPanels: PocketPanelType[] = ['bgm', 'health', 'weather', 'fortune', 'todo', 'skills', 'animation'];
+  const isPocketPanelActive = pocketPanels.includes(activePanel as PocketPanelType);
+
+  return (
+    <div className="relative flex flex-col items-center h-full max-h-[85vh]">
+      {/* 主工具区域 */}
+      <div className="flex flex-col gap-3 flex-1 py-2 overflow-y-auto no-scrollbar">
+        {isPocketOpen ? (
+          // 百宝箱模式：显示返回按钮 + 工具列表
+          <>
+            {/* 返回按钮 */}
+            <ToolbarIcon
+              icon={<ChevronUp size={22} />}
+              active={false}
+              onClick={() => setIsPocketOpen(false)}
+              label="返回"
+            />
+
+            {/* 分隔线 */}
+            <div className="w-8 h-px bg-[#e6ddd0]/60 mx-auto" />
+
+            {/* 工具列表 */}
+            {pocketTools.map((tool) => {
+              const isLocked = tool.requiredLevel ? affinityLevelNum < tool.requiredLevel : false;
+              const isActive = tool.id === 'bgm' ? isBgmPlaying : activePanel === tool.id;
+
+              return (
+                <div key={tool.id}>
+                  <ToolbarIcon
+                    icon={tool.icon}
+                    active={isActive}
+                    onClick={() => !isLocked && handlePocketToolClick(tool.id)}
+                    label={tool.label}
+                    notification={tool.notification}
+                    locked={isLocked}
+                  />
+                </div>
+              );
+            })}
+
+          </>
+        ) : (
+          // 主界面模式
+          <>
+            {/* 记忆 - 核心入口 */}
+            <ToolbarIcon
+              icon={<Brain size={22} />}
+              active={activePanel === 'memory'}
+              onClick={() => togglePanel('memory')}
+              label="记忆"
+              memoryPulse={isMemoryRecording}
+            />
+
+            {/* 好感度 */}
+            <ToolbarIcon
+              icon={<AffinityIndicator variant="toolbar" affinity={affinity} />}
+              active={activePanel === 'affinity'}
+              onClick={() => togglePanel('affinity')}
+              label="好感度"
+            />
+
+            {/* 分隔线 */}
+            <div className="w-8 h-px bg-[#e6ddd0]/60 mx-auto my-1" />
+
+            {/* 百宝箱按钮 */}
+            <div className="relative flex flex-col items-center">
+              <button
+                onClick={() => setIsPocketOpen(true)}
+                className={`
+                  toolbar-btn flex items-center justify-center transition-all duration-300
+                  w-10 h-10 sm:w-12 sm:h-12 md:w-14 md:h-14
+                  rounded-xl sm:rounded-2xl
+                  ${isPocketPanelActive
+                    ? 'active bg-white/90 shadow-lg scale-105' 
+                    : 'hover:bg-white/60 cursor-pointer'}
+                `}
+              >
+                <span className="scale-75 sm:scale-90 md:scale-100 text-[#8b7b6d]">
+                  <Package size={22} />
+                </span>
+                {hasNewTodo && (
+                  <span className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 w-2 h-2 sm:w-2.5 sm:h-2.5 bg-rose-500 rounded-full border-2 border-[#f5f0e8] shadow-sm animate-pulse" />
+                )}
+              </button>
+              <span className={`
+                toolbar-label mt-0.5 sm:mt-1 font-medium transition-colors
+                text-[10px] sm:text-xs
+                ${isPocketPanelActive ? 'text-[#5c4d43]' : 'text-[#a89b8c]'}
+              `}>
+                百宝箱
+              </span>
             </div>
-          );
-        })}
-        </div>
-        
-      {/* Bottom Scroll Button */}
-      <div 
-        className={`flex-shrink-0 mt-1 sm:mt-2 transition-all duration-300 ${
-          showBottomFade ? 'opacity-100' : 'opacity-0 pointer-events-none h-0 mt-0'
-        }`}
-      >
-        <button
-          onClick={scrollDown}
-          className="p-1.5 sm:p-2 rounded-full bg-white/80 backdrop-blur-sm shadow-md hover:bg-white hover:shadow-lg transition-all duration-200 group"
-          aria-label="向下滚动"
-        >
-          <ChevronDown size={14} className="sm:w-4 sm:h-4 text-[#8b7b6d] group-hover:text-[#5c4d43] transition-colors" />
-        </button>
+
+            {/* 分隔线 */}
+            <div className="w-8 h-px bg-[#e6ddd0]/60 mx-auto my-1" />
+
+            {/* 退出按钮 */}
+            <ToolbarIcon
+              icon={<LogOut size={20} />}
+              active={false}
+              onClick={() => onLogout?.()}
+              label="退出"
+            />
+          </>
+        )}
       </div>
     </div>
   );
 };
 
 // Toolbar Icon Component
-const ToolbarIcon = ({ icon, active, onClick, label, notification, locked, lockedMessage }: { 
+const ToolbarIcon = ({ icon, active, onClick, label, notification, locked, lockedMessage, isPrimary, memoryPulse }: { 
   icon: React.ReactNode, 
   active: boolean, 
   onClick: () => void, 
   label: string, 
   notification?: boolean,
   locked?: boolean,
-  lockedMessage?: string
+  lockedMessage?: string,
+  isPrimary?: boolean,
+  memoryPulse?: boolean
 }) => (
     <div className="relative flex flex-col items-center overflow-visible icon-container">
         <button 
@@ -1608,6 +1739,7 @@ const ToolbarIcon = ({ icon, active, onClick, label, notification, locked, locke
                   ? 'active bg-white/90 shadow-lg scale-105' 
                   : 'hover:bg-white/60 cursor-pointer'}
               ${notification ? 'animate-shake' : ''}
+              ${memoryPulse ? 'animate-memory-pulse' : ''}
             `}
         >
             <span className="scale-75 sm:scale-90 md:scale-100">

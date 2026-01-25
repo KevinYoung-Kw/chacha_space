@@ -702,6 +702,105 @@ export const memoryApi = {
   },
 };
 
+// ==================== 每日循环 API ====================
+
+export interface DailyLetter {
+  id: string;
+  date: string;
+  content: string;
+  summary?: string;
+  mood?: string;
+  emotionColor?: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface DailyStatus {
+  userId: string;
+  lastActiveDate?: string;
+  sleepMode: boolean;
+  sleepStartedAt?: string;
+  wakeUpAt?: string;
+}
+
+export interface CalendarDay {
+  date: string;
+  mood?: string;
+  emotionColor?: string;
+  hasLetter: boolean;
+}
+
+export const dailyApi = {
+  /**
+   * 获取今日待读信件
+   */
+  async getLetter(): Promise<ApiResponse<DailyLetter | null>> {
+    return request<DailyLetter | null>('/daily/letter');
+  },
+
+  /**
+   * 标记信件为已读
+   */
+  async markLetterRead(letterId: string): Promise<ApiResponse<void>> {
+    return request<void>(`/daily/letter/${letterId}/read`, {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * 生成每日信件
+   */
+  async generateLetter(date?: string): Promise<ApiResponse<DailyLetter>> {
+    return request<DailyLetter>('/daily/generate-letter', {
+      method: 'POST',
+      body: JSON.stringify({ date }),
+    });
+  },
+
+  /**
+   * 获取用户每日状态
+   */
+  async getStatus(): Promise<ApiResponse<DailyStatus>> {
+    return request<DailyStatus>('/daily/status');
+  },
+
+  /**
+   * 进入睡眠模式（晚安）
+   */
+  async sleep(): Promise<ApiResponse<{ message: string }>> {
+    return request<{ message: string }>('/daily/sleep', {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * 退出睡眠模式
+   */
+  async wake(): Promise<ApiResponse<{ message: string }>> {
+    return request<{ message: string }>('/daily/wake', {
+      method: 'POST',
+    });
+  },
+
+  /**
+   * 获取月份日历数据
+   */
+  async getCalendar(month?: string): Promise<ApiResponse<CalendarDay[]>> {
+    const query = month ? `?month=${month}` : '';
+    return request<CalendarDay[]>(`/daily/calendar${query}`);
+  },
+
+  /**
+   * 获取指定日期详情
+   */
+  async getDayDetail(date: string): Promise<ApiResponse<{
+    letter: DailyLetter | null;
+    messages: any[];
+  }>> {
+    return request(`/daily/day/${date}`);
+  },
+};
+
 // ==================== 管理员 API ====================
 
 // 管理员 Token 管理（独立于普通用户）
@@ -934,6 +1033,7 @@ export const api = {
   tts: ttsApi,
   memory: memoryApi,
   emotion: emotionApi,
+  daily: dailyApi,
   admin: adminApi,
 };
 

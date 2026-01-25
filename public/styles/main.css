@@ -122,9 +122,8 @@ body {
    对话框容器样式
    ======================================== */
 .chat-container {
-  background: rgba(245, 240, 232, 0.15);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  /* 移除全局毛玻璃效果，由子元素分别控制 */
+  background: transparent;
   border: 1px solid var(--color-border-light);
   box-shadow: var(--shadow-soft);
 }
@@ -256,6 +255,50 @@ body {
 }
 .animate-float-up {
   animation: floatUp 3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+/* 记忆脉冲动画 - 用于记忆正在记录时的提示 */
+@keyframes memoryPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(147, 51, 234, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 12px 6px rgba(147, 51, 234, 0.2);
+  }
+}
+.animate-memory-pulse {
+  animation: memoryPulse 2s ease-in-out infinite;
+}
+
+/* 时间感知背景色调 */
+:root[data-time="dawn"] {
+  --bg-tint: rgba(255, 200, 150, 0.08);
+  --bg-gradient: linear-gradient(180deg, rgba(255, 180, 130, 0.1) 0%, transparent 50%);
+}
+:root[data-time="day"] {
+  --bg-tint: transparent;
+  --bg-gradient: none;
+}
+:root[data-time="dusk"] {
+  --bg-tint: rgba(255, 150, 100, 0.1);
+  --bg-gradient: linear-gradient(180deg, rgba(255, 120, 80, 0.08) 0%, transparent 60%);
+}
+:root[data-time="night"] {
+  --bg-tint: rgba(30, 40, 80, 0.12);
+  --bg-gradient: linear-gradient(180deg, rgba(20, 30, 60, 0.1) 0%, transparent 50%);
+}
+
+/* 时间感知背景叠加层 */
+.time-tint-overlay {
+  background: var(--bg-tint, transparent);
+  pointer-events: none;
+  transition: background 2s ease-in-out;
+}
+
+.time-gradient-overlay {
+  background: var(--bg-gradient, none);
+  pointer-events: none;
+  transition: background 2s ease-in-out;
 }
 
 /* 动画延迟 */

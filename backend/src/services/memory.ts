@@ -204,17 +204,97 @@ export function getRecentHistory(
 // ==================== 上下文工程 ====================
 
 /**
- * 构建完整的对话上下文
- * 包含：最近对话历史 + 相关记忆
+ * 获取近 N 天的每日摘要（滑动窗口热数据）
+ */
+export function getRecentDaySummaries(userId: string, days: number = 7): {
+  date: string;
+  summary: string | null;
+  mood: string | null;
+}[] {
+  const summaries = db.prepare(`
+    SELECT date, summary, mood
+    FROM daily_letters
+    WHERE user_id = ?
+    AND date >= date('now', '-' || ? || ' days')
+    ORDER BY date DESC
+  `).all(userId, days) as { date: string; summary: string | null; mood: string | null }[];
+
+  return summaries;
+}
+
+/**
+ * 搜索历史消息（按需 RAG 检索）
+ */
+export function searchMessages(
+  userId: string,
+  query: string,
+  dateRange?: { start: string; end: string },
+  limit: number = 10
+): { role: string; content: string; timestamp: string }[] {
+  let sql = `
+    SELECT role, content, timestamp
+    FROM messages
+    WHERE user_id = ? AND content LIKE ?
+  `;
+  const params: any[] = [userId, `%${query}%`];
+
+  if (dateRange) {
+    sql += ` AND date(timestamp) BETWEEN ? AND ?`;
+    params.push(dateRange.start, dateRange.end);
+  }
+
+  sql += ` ORDER BY timestamp DESC LIMIT ?`;
+  params.push(limit);
+
+  return db.prepare(sql).all(...params) as { role: string; content: string; timestamp: string }[];
+}
+
+/**
+ * 构建完整的对话上下文（增强版：滑动窗口 + 热数据）
+ * 
+ * 包含：
+ * 1. 近 7 天每日摘要（Hot Context）- 保持连续性感知
+ * 2. 当前会话详细历史
+ * 3. 高重要性记忆
  */
 export function buildContext(userId: string): {
   history: { role: string; content: string }[];
   memories: Memory[];
+  recentSummaries: { date: string; summary: string | null; mood: string | null }[];
 } {
+  // 1. 近 7 天摘要（滑动窗口热数据）
+  const recentSummaries = getRecentDaySummaries(userId, 7);
+
+  // 2. 当前会话详细历史（最近 20 条）
   const history = getRecentHistory(userId, 20);
+
+  // 3. 高重要性记忆（最相关的 10 条）
   const memories = getRelevantMemories(userId, 10);
 
-  return { history, memories };
+  return { history, memories, recentSummaries };
+}
+
+/**
+ * 构建带有 RAG 结果的上下文
+ * 当用户查询旧事或细节时调用
+ */
+export function buildContextWithRAG(
+  userId: string,
+  query: string,
+  dateRange?: { start: string; end: string }
+): {
+  history: { role: string; content: string }[];
+  memories: Memory[];
+  recentSummaries: { date: string; summary: string | null; mood: string | null }[];
+  searchResults: { role: string; content: string; timestamp: string }[];
+} {
+  const baseContext = buildContext(userId);
+  const searchResults = searchMessages(userId, query, dateRange, 5);
+
+  return {
+    ...baseContext,
+    searchResults
+  };
 }
 
 /**

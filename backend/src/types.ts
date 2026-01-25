@@ -110,6 +110,47 @@ export interface ConversationSession {
   updatedAt: string;
 }
 
+// ==================== 每日信件 ====================
+
+export type MoodType = 'happy' | 'sad' | 'neutral' | 'excited' | 'anxious' | 'peaceful' | 'tired';
+
+export interface DailyLetter {
+  id: string;
+  userId: string;
+  date: string;          // YYYY-MM-DD
+  content: string;       // 信件内容
+  summary?: string;      // 当日对话摘要
+  mood?: MoodType;       // 心情标签
+  emotionColor?: string; // 情感色块
+  isRead: boolean;
+  createdAt: string;
+}
+
+// ==================== 每日状态 ====================
+
+export interface DailyStatus {
+  userId: string;
+  lastActiveDate?: string;  // YYYY-MM-DD
+  sleepMode: boolean;
+  sleepStartedAt?: string;
+  wakeUpAt?: string;
+}
+
+// ==================== 用户偏好画像 ====================
+
+export type PreferenceCategory = 'nickname' | 'food' | 'taboo' | 'anniversary' | 'hobby' | 'other';
+
+export interface UserPreference {
+  id: string;
+  userId: string;
+  category: PreferenceCategory;
+  content: string;
+  sourceMemoryId?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ==================== 天气数据 ====================
 
 export interface ForecastDay {

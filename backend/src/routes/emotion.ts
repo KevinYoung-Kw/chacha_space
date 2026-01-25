@@ -102,7 +102,7 @@ ${actionsList}
 5. 如果用户在打招呼，返回 wave
 6. 如果情绪不明显，返回 speaking`;
 
-    const response = await fetch('https://api.minimax.chat/v1/text/chatcompletion_v2', {
+    const response = await fetch('https://api.minimaxi.com/v1/text/chatcompletion_v2', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,

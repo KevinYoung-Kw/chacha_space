@@ -49,17 +49,22 @@ const MIN_CORE_VIDEOS_REQUIRED = 1;
 const CORE_VIDEOS = [
   '/character/idle_action_1.webm',  // 主待机动画
   '/character/happy.webm',           // 说话/开心动画
+  '/character/excited.webm',         // 挥手动画
+  '/character/observing.webm',       // 思考动画
+  '/character/idle_action_4.webm',   // 过渡动画
 ];
 
 // 常用视频 - 登录后立即加载
 const COMMON_VIDEOS = [
   '/character/idle_action_3.webm',   // 左侧待机
-  '/character/idle_alt.webm',
-  '/character/idle_action_4.webm',
-  '/character/listening_v2.webm',
-  '/character/taking_notes.webm',
-  '/character/shy.webm',
-  '/character/excited.webm',
+  '/character/idle_alt.webm',        // 待机变体
+  '/character/listening_v2.webm',    // 聆听
+  '/character/taking_notes.webm',    // 记笔记
+  '/character/shy.webm',             // 害羞
+  '/character/sleeping.webm',        // 睡觉
+  '/character/weather.webm',         // 天气
+  '/character/tarot_reading.webm',   // 塔罗占卜
+  '/character/drinking_water.webm',  // 喝水
 ];
 
 // 扩展视频 - 按需懒加载
@@ -75,19 +80,15 @@ const EXTENDED_VIDEOS = [
   '/character/jump.webm',
   '/character/using_phone.webm',
   '/character/checking_phone.webm',
-  '/character/sleeping.webm',
   '/character/sleeping_long.webm',
-  '/character/weather.webm',
   '/character/skill.webm',
   '/character/wind_blowing.webm',
   '/character/strong_wind.webm',
   '/character/wind_blowing_2.webm',
   '/character/dancing.webm',
   '/character/dancing_2.webm',
-  '/character/tarot_reading.webm',
   '/character/surprised_observe.webm',
-  '/character/drinking_water.webm',
-  '/character/observing.webm',
+  '/character/excited_v2.webm',
 ];
 
 // ==================== 单例类 ====================

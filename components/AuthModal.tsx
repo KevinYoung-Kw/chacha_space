@@ -10,7 +10,7 @@ interface AuthModalProps {
 type TabType = 'register' | 'login';
 
 export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
-  const [activeTab, setActiveTab] = useState<TabType>('register');
+  const [activeTab, setActiveTab] = useState<TabType>('login');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -322,6 +322,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
                   {inviteStatus.message}
                 </p>
               )}
+              {/* 体验联系提示 */}
+              <p className="text-[10px] sm:text-xs mt-1.5 text-[#8b7b6d]">
+                体验请联系{' '}
+                <a 
+                  href="https://www.kw-aigc.cn" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-[#5c4d43] hover:text-[#8b7b6d] underline transition-colors"
+                >
+                  www.kw-aigc.cn
+                </a>
+              </p>
             </div>
 
             {/* Submit Button */}
@@ -404,6 +416,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess }) => {
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
+              {/* 体验联系提示 */}
+              <p className="text-[10px] sm:text-xs mt-1.5 text-[#8b7b6d]">
+                体验请联系{' '}
+                <a 
+                  href="https://www.kw-aigc.cn" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-[#5c4d43] hover:text-[#8b7b6d] underline transition-colors"
+                >
+                  www.kw-aigc.cn
+                </a>
+              </p>
             </div>
 
             {/* Submit Button */}

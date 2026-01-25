@@ -6,10 +6,9 @@
 import { config } from '../config';
 import { Message, TodoItem, TodoCategory, HealthSummary, WeatherData, TarotResult, Memory } from '../types';
 
-// ==================== 动态工具定义 ====================
+// ==================== 工具定义（简洁版） ====================
 
 function buildTools(categories: TodoCategory[]) {
-  // 构建分类ID到名称的映射，用于AI理解
   const categoryMap = categories.map(c => `${c.id}(${c.name})`).join(', ');
   
   return [
@@ -140,6 +139,21 @@ function buildTools(categories: TodoCategory[]) {
           required: ["content", "type"]
         }
       }
+    },
+    {
+      type: "function",
+      function: {
+        name: "searchMemory",
+        description: "当用户提到7天前的旧事、或需要查找具体细节时调用。用于检索历史对话记录。",
+        parameters: {
+          type: "object",
+          properties: {
+            query: { type: "string", description: "搜索关键词" },
+            dateRange: { type: "string", description: "时间范围描述，如 '上周' '去年生日' '上个月'" }
+          },
+          required: ["query"]
+        }
+      }
     }
   ];
 }
@@ -153,6 +167,7 @@ interface UserContext {
   healthData: HealthSummary;
   weather?: WeatherData | null;
   memories: Memory[];
+  recentSummaries?: { date: string; summary: string | null; mood: string | null }[];
 }
 
 function buildSystemPrompt(context: UserContext): string {
@@ -196,6 +211,13 @@ function buildSystemPrompt(context: UserContext): string {
       }).join('\n')}`
     : '';
 
+  // 构建近 7 天摘要（滑动窗口热数据）
+  const recentSummariesContext = context.recentSummaries && context.recentSummaries.length > 0
+    ? `\n【近7天回忆】\n${context.recentSummaries.map(s => 
+        `- ${s.date}${s.mood ? ` (${s.mood})` : ''}: ${s.summary || '这天没有特别的事'}`
+      ).join('\n')}`
+    : '';
+
   const stateContext = `
 【当前用户状态】
 - 用户昵称: ${context.userName || '用户'}
@@ -207,6 +229,7 @@ ${categoriesInfo}
 - 今日运动: ${context.healthData.exercise.current}分钟
 ${context.weather ? `- 当前天气: ${context.weather.city} ${context.weather.temp}°C ${context.weather.condition}` : ''}
 ${memoryContext}
+${recentSummariesContext}
 `;
 
   return `# Role: 叉叉 (Cha Cha)
@@ -243,12 +266,76 @@ ${memoryContext}
 - **注意待办截止时间**：如果有待办即将到期或已逾期，要主动温柔提醒用户
 - 当用户说"明天"、"后天"、"下周一"等时间词时，要准确计算对应的具体日期时间
 - 当用户提到重要的个人信息（喜好、习惯、关系等）时，使用 saveMemory 工具保存
-- 参考长期记忆中的信息，让对话更加个性化和贴心
+- 参考长期记忆和近7天回忆中的信息，让对话更加个性化和贴心
+
+## 5. 回忆风格（渐进式披露）
+当用户提到过去的事情，或你需要通过 searchMemory 工具检索历史信息时：
+- **第一步 - 模糊唤起**：先表现出"似乎有印象"，例如："这事儿我好像有印象..." / "你是说上次那个...？"
+- **第二步 - 细节确认**：随着对话深入，再抛出具体细节，例如："对了！当时你还说了..." / "我记得那次..."
+- **若检索无结果**：诚实表达遗忘，并请求补充，例如："哎呀，我这个猪脑子好像记混了，你能再提醒我一下吗？"
+- **禁止直接复述原始数据**：不要说"数据库显示你上周二说..."，要用自然的语言表达
 
 ${stateContext}
 
 当前日期: ${new Date(Date.now() + 8 * 60 * 60 * 1000).toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long', timeZone: 'Asia/Shanghai' })}
 `;
+}
+
+// ==================== 意图检测 ====================
+
+type IntentType = 'task' | 'query' | 'chat';
+
+interface IntentResult {
+  type: IntentType;
+  confidence: number;
+  suggestedTools: string[];
+}
+
+/**
+ * 快速意图预检测：判断用户是否想执行任务
+ */
+async function detectIntent(userInput: string): Promise<IntentResult> {
+  // 关键词匹配（快速路径，不用调用 API）
+  const taskKeywords = [
+    // 待办相关
+    '记一下', '记录', '帮我记', '添加', '新建', '创建', '加一个',
+    '待办', '提醒', '备忘', '日志', '日记',
+    '完成', '删除', '勾掉', '取消',
+    // 健康相关
+    '喝水', '喝了', '记水',
+    // 天气
+    '天气', '温度', '下雨',
+    // 占卜
+    '占卜', '塔罗', '算一卦',
+    // 打开面板
+    '打开', '看看', '查看'
+  ];
+
+  const queryKeywords = ['多少', '几个', '查询', '有哪些', '列表', '状态'];
+
+  const inputLower = userInput.toLowerCase();
+  
+  // 检测任务意图
+  const taskScore = taskKeywords.filter(k => inputLower.includes(k)).length;
+  const queryScore = queryKeywords.filter(k => inputLower.includes(k)).length;
+  
+  // 根据关键词推断可能需要的工具
+  const suggestedTools: string[] = [];
+  if (inputLower.match(/记|添加|待办|提醒|备忘|日志|日记/)) suggestedTools.push('addTodo');
+  if (inputLower.match(/完成|勾掉|做完/)) suggestedTools.push('toggleTodo');
+  if (inputLower.match(/删除|删掉|去掉/)) suggestedTools.push('deleteTodo');
+  if (inputLower.match(/喝水|喝了|ml|毫升/)) suggestedTools.push('addWater');
+  if (inputLower.match(/天气|温度|下雨|晴/)) suggestedTools.push('getWeather');
+  if (inputLower.match(/占卜|塔罗|算.*卦|运势/)) suggestedTools.push('drawTarot');
+  if (inputLower.match(/健康|喝水量|运动|睡眠/)) suggestedTools.push('getHealthStatus');
+
+  if (taskScore > 0) {
+    return { type: 'task', confidence: Math.min(taskScore * 0.3, 1), suggestedTools };
+  }
+  if (queryScore > 0) {
+    return { type: 'query', confidence: Math.min(queryScore * 0.3, 1), suggestedTools };
+  }
+  return { type: 'chat', confidence: 0.5, suggestedTools: [] };
 }
 
 // ==================== 对话生成 ====================
@@ -263,6 +350,69 @@ export interface ChatResponse {
   toolCalls: ToolCall[];
 }
 
+/**
+ * 单次 LLM 调用
+ */
+async function callLLM(
+  messages: any[],
+  tools: any[],
+  toolChoice: 'auto' | 'required' | 'none' = 'auto'
+): Promise<{ content: string; toolCalls: ToolCall[] }> {
+  const apiKey = config.minimax.apiKey;
+  
+  const response = await fetch(`${config.minimax.baseUrl}/v1/text/chatcompletion_v2`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: config.minimax.chatModel,
+      messages,
+      tools: tools.length > 0 ? tools : undefined,
+      tool_choice: tools.length > 0 ? toolChoice : undefined,
+      temperature: 0.7,
+      max_tokens: 1024
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`API Error: ${response.status}`);
+  }
+
+  const data = await response.json() as any;
+  if (data.base_resp?.status_code !== 0) {
+    throw new Error(data.base_resp?.status_msg || 'Unknown error');
+  }
+
+  const message = data.choices?.[0]?.message;
+  if (!message) {
+    return { content: '', toolCalls: [] };
+  }
+
+  const toolCalls: ToolCall[] = [];
+  if (message.tool_calls?.length > 0) {
+    for (const tc of message.tool_calls) {
+      try {
+        toolCalls.push({
+          name: tc.function?.name || '',
+          arguments: JSON.parse(tc.function?.arguments || '{}')
+        });
+      } catch (e) {
+        console.error('[Agent] Failed to parse tool arguments:', e);
+      }
+    }
+  }
+
+  return { content: message.content || '', toolCalls };
+}
+
+/**
+ * ReAct Agent：支持多轮工具调用
+ * 1. 检测意图
+ * 2. 首次调用（auto）
+ * 3. 如果是任务意图但没有调用工具，强制重试（required）
+ */
 export async function generateChatResponse(
   history: { role: string; content: string }[],
   userInput: string,
@@ -274,66 +424,51 @@ export async function generateChatResponse(
   const systemPrompt = buildSystemPrompt(context);
   const tools = buildTools(context.categories);
 
+  // Step 1: 意图预检测
+  const intent = await detectIntent(userInput);
+  console.log(`[Agent] 意图检测: ${intent.type} (${(intent.confidence * 100).toFixed(0)}%), 建议工具: ${intent.suggestedTools.join(', ') || '无'}`);
+
   const messages = [
     { role: "system", content: systemPrompt },
-    ...history.slice(-20), // 保留最近 20 条消息
+    ...history.slice(-20),
     { role: "user", content: userInput }
   ];
 
   try {
-    // 第一次调用：让模型决定是否需要调用工具
-    const response = await fetch(`${config.minimax.baseUrl}/v1/text/chatcompletion_v2`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: config.minimax.chatModel,
-        messages: messages,
-        tools: tools,
-        tool_choice: "auto",
-        temperature: 0.7,
-        max_tokens: 1024
-      })
-    });
-
-    if (!response.ok) {
-      console.error("MiniMax API Error:", await response.text());
-      return { content: "呜...时间线好像出了点小波动，稍后再试试吧~", toolCalls: [] };
-    }
-
-    const data = await response.json() as any;
+    // Step 2: 首次调用（auto 模式）
+    let result = await callLLM(messages, tools, 'auto');
     
-    if (data.base_resp?.status_code !== 0) {
-      console.error("MiniMax API Error:", data.base_resp?.status_msg);
-      return { content: "连接不稳定，请稍后再试呢...", toolCalls: [] };
-    }
+    // Step 3: 如果是任务意图但没有调用工具，强制重试
+    if (intent.type === 'task' && result.toolCalls.length === 0 && intent.suggestedTools.length > 0) {
+      console.log('[Agent] 任务意图但未调用工具，强制重试...');
+      
+      // 构建强化提示
+      const reinforcePrompt = `用户明确想要执行操作，请务必调用相关工具。
+可能需要的工具：${intent.suggestedTools.join('、')}
+用户说：${userInput}
 
-    const choice = data.choices?.[0];
-    if (!choice) return { content: "嗯？你刚刚说什么呀？", toolCalls: [] };
+请分析用户意图并调用合适的工具。`;
 
-    const message = choice.message;
-    const toolCalls: ToolCall[] = [];
+      const reinforcedMessages = [
+        ...messages,
+        { role: "assistant", content: result.content || "让我帮你处理一下..." },
+        { role: "user", content: reinforcePrompt }
+      ];
 
-    // 提取工具调用
-    if (message.tool_calls && message.tool_calls.length > 0) {
-      for (const tc of message.tool_calls) {
-        toolCalls.push({
-          name: tc.function?.name || '',
-          arguments: JSON.parse(tc.function?.arguments || '{}')
-        });
+      // 强制调用工具
+      const retryResult = await callLLM(reinforcedMessages, tools, 'required');
+      
+      if (retryResult.toolCalls.length > 0) {
+        console.log(`[Agent] 重试成功，调用工具: ${retryResult.toolCalls.map(t => t.name).join(', ')}`);
+        return retryResult;
       }
     }
 
-    return {
-      content: message.content || "",
-      toolCalls
-    };
+    return result;
 
   } catch (error) {
-    console.error("MiniMax Service Error:", error);
-    return { content: "呜...时间线好像出了点小波动，稍后再试试吧~", toolCalls: [] };
+    console.error("[Agent] Error:", error);
+    return { content: "呜...出了点小问题，稍后再试试吧~", toolCalls: [] };
   }
 }
 

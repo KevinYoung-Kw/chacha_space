@@ -15,7 +15,8 @@ import {
   saveMemory,
   createSession,
   getSessions,
-  buildContext
+  buildContext,
+  searchMessages
 } from '../services/memory';
 import { ApiResponse, TodoItem, TodoCategory, HealthSummary, TarotResult, TarotCard } from '../types';
 
@@ -194,6 +195,17 @@ router.post('/message', async (req: Request, res: Response<ApiResponse>) => {
 
     // 获取或创建会话
     let activeSessionId = sessionId;
+    
+    // 如果提供了 sessionId，验证它是否存在
+    if (activeSessionId) {
+      const sessionExists = db.prepare('SELECT id FROM conversation_sessions WHERE id = ? AND user_id = ?').get(activeSessionId, userId);
+      if (!sessionExists) {
+        console.log('[Chat] Session not found, creating new session');
+        activeSessionId = null; // 会话不存在，重置为 null
+      }
+    }
+    
+    // 如果没有有效的会话，获取最近的或创建新的
     if (!activeSessionId) {
       const sessions = getSessions(userId, 1);
       if (sessions.length > 0) {
@@ -210,13 +222,13 @@ router.post('/message', async (req: Request, res: Response<ApiResponse>) => {
     // 获取用户名
     const user = db.prepare('SELECT name FROM users WHERE id = ?').get(userId) as { name: string };
 
-    // 构建上下文
-    const { history, memories } = buildContext(userId);
+    // 构建上下文（包含滑动窗口热数据）
+    const { history, memories, recentSummaries } = buildContext(userId);
     const todos = getUserTodos(userId);
     const categories = getUserCategories(userId);
     const healthData = getUserHealthSummary(userId);
 
-    // 生成 AI 回复
+    // 生成 AI 回复（传入滑动窗口热数据）
     const response = await generateChatResponse(
       history,
       message,
@@ -225,7 +237,8 @@ router.post('/message', async (req: Request, res: Response<ApiResponse>) => {
         todos,
         categories,
         healthData,
-        memories
+        memories,
+        recentSummaries
       }
     );
 
@@ -400,7 +413,53 @@ async function executeToolCall(
 
     case 'saveMemory': {
       const memory = saveMemory(userId, args.content, args.type, args.importance || 5);
-      return { data: { success: true, memoryId: memory.id } };
+      return { 
+        data: { success: true, memoryId: memory.id },
+        action: { type: 'memoryRecorded', data: { memoryId: memory.id, content: args.content } }
+      };
+    }
+
+    case 'searchMemory': {
+      // 解析时间范围
+      let dateRange: { start: string; end: string } | undefined;
+      if (args.dateRange) {
+        const now = new Date();
+        const rangeStr = args.dateRange.toLowerCase();
+        
+        if (rangeStr.includes('上周') || rangeStr.includes('last week')) {
+          const start = new Date(now);
+          start.setDate(start.getDate() - 14);
+          const end = new Date(now);
+          end.setDate(end.getDate() - 7);
+          dateRange = { 
+            start: start.toISOString().split('T')[0], 
+            end: end.toISOString().split('T')[0] 
+          };
+        } else if (rangeStr.includes('上个月') || rangeStr.includes('last month')) {
+          const start = new Date(now);
+          start.setMonth(start.getMonth() - 2);
+          const end = new Date(now);
+          end.setMonth(end.getMonth() - 1);
+          dateRange = { 
+            start: start.toISOString().split('T')[0], 
+            end: end.toISOString().split('T')[0] 
+          };
+        }
+        // 可以添加更多时间范围解析逻辑
+      }
+
+      const results = searchMessages(userId, args.query, dateRange, 5);
+      return { 
+        data: { 
+          success: true, 
+          results: results.map(r => ({
+            role: r.role,
+            content: r.content.substring(0, 100) + (r.content.length > 100 ? '...' : ''),
+            timestamp: r.timestamp
+          })),
+          count: results.length
+        }
+      };
     }
 
     default:

@@ -1,7 +1,7 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { Message } from '../types';
-import { Send, Mic, MicOff, AlertCircle } from 'lucide-react';
+import { Send, Mic, MicOff, AlertCircle, Moon } from 'lucide-react';
 
 interface ChatInterfaceProps {
   messages: Message[];
@@ -11,6 +11,8 @@ interface ChatInterfaceProps {
   onStopListening: () => void;
   inputRef: React.RefObject<HTMLInputElement>;
   isSpeaking?: boolean;
+  onGoodNight?: () => void;
+  isSleepMode?: boolean;
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ 
@@ -20,7 +22,9 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onStartListening,
   onStopListening,
   inputRef,
-  isSpeaking = false
+  isSpeaking = false,
+  onGoodNight,
+  isSleepMode = false
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -89,18 +93,18 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   return (
     <div className="w-full pointer-events-auto">
-      {/* Combined Dialog Box - Glass morphism container */}
+      {/* Combined Dialog Box */}
       <div className="chat-container rounded-[1.8rem] overflow-hidden" style={{ 
-        background: 'rgba(245, 240, 232, 0.15)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
         border: '1px solid rgba(230, 221, 208, 0.6)',
         boxShadow: '0 4px 20px rgba(92, 77, 67, 0.08)'
       }}>
-        {/* Dialog Display Area - Shows conversation with scrolling */}
+        {/* Dialog Display Area - Shows conversation with scrolling - 只有透明度，无毛玻璃 */}
         <div
           ref={scrollContainerRef}
-          className="px-5 py-4 max-h-[180px] min-h-[80px] overflow-y-auto border-b border-[#e6ddd0]/40 scrollbar-custom bg-transparent"
+          className="px-5 py-4 max-h-[180px] min-h-[80px] overflow-y-auto border-b border-[#e6ddd0]/40 scrollbar-custom"
+          style={{
+            background: 'rgba(245, 240, 232, 0.2)'
+          }}
         >
           <div className="flex flex-col gap-3 text-sm">
             {messages.length === 0 ? (
@@ -123,8 +127,12 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </div>
         </div>
 
-        {/* Input Bar - Bottom section */}
-        <div className="px-4 py-3 flex items-center gap-3 bg-transparent">
+        {/* Input Bar - Bottom section - 保持毛玻璃效果 */}
+        <div className="px-4 py-3 flex items-center gap-3" style={{
+          background: 'rgba(245, 240, 232, 0.15)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)'
+        }}>
           {/* Text Input */}
           <div className="flex-1 h-[36px] relative">
               <input
@@ -193,15 +201,26 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           {/* Send Button */}
           <button 
               onClick={handleSendClick}
-              disabled={isListening}
+              disabled={isListening || isSleepMode}
               className={`toolbar-btn w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-95 ${
-                isListening
+                isListening || isSleepMode
                   ? 'opacity-50 cursor-not-allowed text-[#8b7b6d]'
                   : 'text-[#8b7b6d] hover:text-[#5c4d43] hover:bg-[#e6ddd0] cursor-pointer'
               }`}
           >
               <Send size={18} />
           </button>
+
+          {/* Good Night Button - 只在晚上时间显示 */}
+          {onGoodNight && !isSleepMode && new Date().getHours() >= 18 && (
+            <button 
+                onClick={onGoodNight}
+                className="toolbar-btn w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-95 text-amber-500 hover:text-amber-600 hover:bg-amber-50 cursor-pointer"
+                title="晚安"
+            >
+                <Moon size={18} />
+            </button>
+          )}
         </div>
       </div>
       

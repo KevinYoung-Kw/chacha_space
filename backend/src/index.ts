@@ -24,6 +24,7 @@ import memoryRoutes from './routes/memory';
 import emotionRoutes from './routes/emotion';
 import affinityRoutes from './routes/affinity';
 import adminRoutes from './routes/admin';
+import dailyRoutes from './routes/daily';
 
 // 导入工具
 import bcrypt from 'bcryptjs';
@@ -69,6 +70,7 @@ app.use('/api/memories', memoryRoutes);
 app.use('/api/emotion', emotionRoutes);
 app.use('/api/affinity', affinityRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/daily', dailyRoutes);
 
 // ==================== 健康检查 ====================
 
